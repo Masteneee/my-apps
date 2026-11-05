@@ -2,8 +2,7 @@
 // Supabase handles passwords, Google login and sessions for us, and stores
 // profiles in a Postgres table protected by Row Level Security (RLS).
 
-import { createClient } from "@supabase/supabase-js";
-import type { User } from "@supabase/supabase-js";
+import type { SupabaseClient, User } from "@supabase/supabase-js";
 import type { AuthService, AuthUser, NewProfile, Profile } from "./types";
 import { normalizeUsername, validateCredentials, validateDisplayName, validateUsername } from "./validation";
 
@@ -51,11 +50,9 @@ function redirectUrl(): string {
   return `${window.location.origin}/onboarding`;
 }
 
-export function createSupabaseAuthService(url: string, anonKey: string): AuthService {
-  // "pkce" is the recommended, more secure login flow for browser apps.
-  // The client also reads the login result from the URL when Google sends us back.
-  const supabase = createClient(url, anonKey, { auth: { flowType: "pkce" } });
-
+// `supabase` is the shared client from lib/supabase/client.ts (Stage 2 moved
+// its creation there so the media store can use the same login session).
+export function createSupabaseAuthService(supabase: SupabaseClient): AuthService {
   return {
     mode: "supabase",
 

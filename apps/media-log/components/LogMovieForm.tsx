@@ -1,0 +1,194 @@
+"use client";
+// The "log this movie" form: status, rating, review, watched date, rewatch.
+// The rules (rating in half steps, no rating for "Want to watch"...) live in
+// lib/media/validation.ts; the store checks them and throws a friendly error.
+
+import { useState } from "react";
+import { MOVIE_STATUS_LABELS, ratingToStars } from "@/lib/media/display";
+import { getMediaStore, type LogStatus, type LogWithMedia, type MediaResult } from "@/lib/media";
+import { LOG_STATUSES } from "@/lib/media/types";
+import { localToday, RATING_OPTIONS, REVIEW_MAX } from "@/lib/media/validation";
+import { Poster } from "./Poster";
+
+type Props = {
+  media: MediaResult;
+  onSaved: (log: LogWithMedia) => void;
+  onCancel: () => void;
+};
+
+export function LogMovieForm({ media, onSaved, onCancel }: Props) {
+  const [status, setStatus] = useState<LogStatus>("completed");
+  const [rating, setRating] = useState<number | null>(null);
+  const [review, setReview] = useState("");
+  const [finishedAt, setFinishedAt] = useState(() => localToday());
+  const [rewatch, setRewatch] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const watched = status === "completed";
+  const canRate = status !== "planned";
+
+  function changeStatus(next: LogStatus) {
+    setStatus(next);
+    // "Want to watch" can't have a rating, so clear it instead of showing an error later.
+    if (next === "planned") setRating(null);
+  }
+
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setError(null);
+    setBusy(true);
+    try {
+      const log = await getMediaStore().addLog({
+        media,
+        status,
+        rating,
+        reviewText: review,
+        finishedAt: watched && finishedAt ? finishedAt : null,
+        rewatch,
+      });
+      onSaved(log);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not save your log.");
+      setBusy(false);
+    }
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="rounded-lg border border-zinc-800 bg-zinc-900 p-5 sm:p-6">
+      <div className="flex gap-4">
+        <div className="w-20 shrink-0 sm:w-28">
+          <Poster src={media.coverUrl} title={media.title} />
+        </div>
+        <div className="min-w-0">
+          <p className="text-sm text-zinc-400">Log a movie</p>
+          <h2 className="text-xl font-bold sm:text-2xl">
+            {media.title} {media.year && <span className="font-normal text-zinc-400">({media.year})</span>}
+          </h2>
+          {media.originalTitle && <p className="text-sm text-zinc-500">{media.originalTitle}</p>}
+        </div>
+      </div>
+
+      {/* fieldset + legend groups the radio buttons under one label for screen readers. */}
+      <fieldset className="mt-6">
+        <legend className="text-sm font-medium text-zinc-300">Status</legend>
+        <div className="mt-2 flex flex-wrap gap-2">
+          {LOG_STATUSES.map((value) => (
+            <label
+              key={value}
+              className={`cursor-pointer rounded-full border px-3 py-1.5 text-sm has-focus-visible:ring-2 has-focus-visible:ring-violet-400 ${
+                status === value
+                  ? "border-violet-400 bg-violet-500/20 text-violet-200"
+                  : "border-zinc-700 text-zinc-300 hover:bg-zinc-800"
+              }`}
+            >
+              {/* The real radio is hidden (sr-only) but still works with the keyboard. */}
+              <input
+                type="radio"
+                name="status"
+                value={value}
+                checked={status === value}
+                onChange={() => changeStatus(value)}
+                className="sr-only"
+              />
+              {MOVIE_STATUS_LABELS[value]}
+            </label>
+          ))}
+        </div>
+      </fieldset>
+
+      <div className="mt-5 grid gap-5 sm:grid-cols-2">
+        <div>
+          <label htmlFor="rating" className="block text-sm font-medium text-zinc-300">
+            Rating
+          </label>
+          <select
+            id="rating"
+            value={rating ?? ""}
+            disabled={!canRate}
+            // A <select> always gives text: "" means no rating, "3.5" becomes 3.5.
+            onChange={(e) => setRating(e.target.value === "" ? null : Number(e.target.value))}
+            className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 outline-none focus:border-violet-400 disabled:opacity-50"
+          >
+            <option value="">No rating</option>
+            {RATING_OPTIONS.map((value) => (
+              <option key={value} value={value}>
+                {ratingToStars(value)} ({value})
+              </option>
+            ))}
+          </select>
+          {!canRate && <p className="mt-1 text-xs text-zinc-500">Rate it once you&apos;ve watched it.</p>}
+        </div>
+
+        {watched && (
+          <div>
+            <label htmlFor="finished-at" className="block text-sm font-medium text-zinc-300">
+              Watched on <span className="text-zinc-500">(optional)</span>
+            </label>
+            <input
+              id="finished-at"
+              type="date"
+              value={finishedAt}
+              max={localToday()} // the date picker won't offer future days
+              onChange={(e) => setFinishedAt(e.target.value)}
+              className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 outline-none focus:border-violet-400"
+            />
+          </div>
+        )}
+      </div>
+
+      {watched && (
+        <label className="mt-4 flex items-center gap-2 text-sm text-zinc-300">
+          <input
+            type="checkbox"
+            checked={rewatch}
+            onChange={(e) => setRewatch(e.target.checked)}
+            className="h-4 w-4 accent-violet-500"
+          />
+          I&apos;ve seen it before (rewatch)
+        </label>
+      )}
+
+      <div className="mt-5">
+        <label htmlFor="review" className="block text-sm font-medium text-zinc-300">
+          Review <span className="text-zinc-500">(optional)</span>
+        </label>
+        <textarea
+          id="review"
+          rows={4}
+          maxLength={REVIEW_MAX}
+          value={review}
+          onChange={(e) => setReview(e.target.value)}
+          placeholder="What did you think?"
+          className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 outline-none placeholder:text-zinc-600 focus:border-violet-400"
+        />
+        <p className="mt-1 text-right text-xs text-zinc-500">
+          {review.length}/{REVIEW_MAX}
+        </p>
+      </div>
+
+      {error && (
+        <p role="alert" className="mt-3 text-sm text-red-400">
+          {error}
+        </p>
+      )}
+
+      <div className="mt-5 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+        <button
+          type="button"
+          onClick={onCancel}
+          className="rounded-md border border-zinc-700 px-4 py-2.5 font-medium hover:bg-zinc-800"
+        >
+          Back to results
+        </button>
+        <button
+          type="submit"
+          disabled={busy}
+          className="rounded-md bg-violet-500 px-5 py-2.5 font-medium text-white hover:bg-violet-400 disabled:opacity-60"
+        >
+          {busy ? "Saving..." : "Save to my log"}
+        </button>
+      </div>
+    </form>
+  );
+}

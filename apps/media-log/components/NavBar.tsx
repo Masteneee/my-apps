@@ -23,6 +23,10 @@ export function NavBar() {
         </Link>
 
         <div className="flex items-center gap-2 text-sm">
+          {/* Search works for everyone; logging a result needs an account. */}
+          <Link href="/search" className="rounded-md px-3 py-2 text-zinc-300 hover:bg-zinc-800 hover:text-white">
+            Search
+          </Link>
           {/* While loading we show nothing, so the buttons don't flicker. */}
           {status === "signed-out" && (
             <>

@@ -4,15 +4,47 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { getAuthService, type Profile } from "@/lib/auth";
 import { normalizeUsername } from "@/lib/auth/validation";
+import { getMediaStore, type LogWithMedia } from "@/lib/media";
+import { countByType, latestLogPerItem } from "@/lib/media/display";
+import type { MediaType } from "@/lib/media/types";
 import { useAuth } from "./AuthProvider";
+import { PosterGrid } from "./PosterGrid";
 
-// The media types the app will cover (shown as empty counters for now).
-const MEDIA_TYPES = ["Movies", "Series", "Anime", "Manga", "Books", "Games"];
+// The media types the app will cover, with the word shown under each counter.
+const COUNTERS: { type: MediaType; label: string }[] = [
+  { type: "movie", label: "Movies" },
+  { type: "series", label: "Series" },
+  { type: "anime", label: "Anime" },
+  { type: "manga", label: "Manga" },
+  { type: "book", label: "Books" },
+  { type: "game", label: "Games" },
+];
 
 // The result of looking up a username. We keep the username we looked up next
 // to the result, so after navigating to another profile we know the old
 // result is stale and show "Loading" instead of the wrong person.
-type Lookup = { username: string; profile: Profile | null; error: string | null };
+type Lookup = {
+  username: string;
+  profile: Profile | null;
+  logs: LogWithMedia[]; // newest first
+  error: string | null; // the profile itself couldn't load
+  logsError: string | null; // the profile loaded, but its logs didn't
+};
+
+// Loads the profile, then (if it exists) its logs. Kept outside the component
+// because it doesn't need any React state.
+async function loadProfilePage(username: string): Promise<Lookup> {
+  const profile = await getAuthService().getProfileByUsername(username);
+  if (!profile) return { username, profile: null, logs: [], error: null, logsError: null };
+  try {
+    const logs = await getMediaStore().getLogsForUser(profile.id);
+    return { username, profile, logs, error: null, logsError: null };
+  } catch (err) {
+    // e.g. the Stage 2 tables don't exist yet: still show the profile, plus the reason.
+    const message = err instanceof Error ? err.message : "Could not load the logs.";
+    return { username, profile, logs: [], error: null, logsError: message };
+  }
+}
 
 export function ProfileView({ username }: { username: string }) {
   const { user } = useAuth();
@@ -21,14 +53,13 @@ export function ProfileView({ username }: { username: string }) {
 
   useEffect(() => {
     let cancelled = false;
-    getAuthService()
-      .getProfileByUsername(wanted)
-      .then((profile) => {
-        if (!cancelled) setLookup({ username: wanted, profile, error: null });
+    loadProfilePage(wanted)
+      .then((result) => {
+        if (!cancelled) setLookup(result);
       })
       .catch((err: unknown) => {
         const message = err instanceof Error ? err.message : "Could not load this profile.";
-        if (!cancelled) setLookup({ username: wanted, profile: null, error: message });
+        if (!cancelled) setLookup({ username: wanted, profile: null, logs: [], error: message, logsError: null });
       });
     return () => {
       cancelled = true;
@@ -59,6 +90,9 @@ export function ProfileView({ username }: { username: string }) {
 
   const isMe = user?.id === profile.id;
   const name = profile.display_name || profile.username;
+  // Each movie once (its most recent log), and how many of each type.
+  const posters = latestLogPerItem(lookup.logs);
+  const counts = countByType(lookup.logs);
 
   return (
     <div>
@@ -87,22 +121,47 @@ export function ProfileView({ username }: { username: string }) {
 
       {/* One counter per media type. grid-cols-3 on phones, 6 in a row on wider screens. */}
       <section className="mt-10 grid grid-cols-3 gap-3 sm:grid-cols-6">
-        {MEDIA_TYPES.map((type) => (
+        {COUNTERS.map(({ type, label }) => (
           <div key={type} className="rounded-lg border border-zinc-800 bg-zinc-900 p-3 text-center">
-            <div className="text-2xl font-bold">0</div>
-            <div className="text-xs text-zinc-400">{type}</div>
+            <div className="text-2xl font-bold">{counts[type]}</div>
+            <div className="text-xs text-zinc-400">{label}</div>
           </div>
         ))}
       </section>
 
-      <section className="mt-10 rounded-lg border border-dashed border-zinc-700 p-10 text-center">
-        <h2 className="text-lg font-semibold">Nothing logged yet</h2>
-        <p className="mt-2 text-zinc-400">
-          {isMe
-            ? "Soon you'll search for a movie, rate it and see it here. (That's Stage 2!)"
-            : `@${profile.username} hasn't logged anything yet.`}
+      {lookup.logsError && (
+        <p role="alert" className="mt-6 text-sm text-red-400">
+          {lookup.logsError}
         </p>
-      </section>
+      )}
+
+      {posters.length > 0 ? (
+        <section className="mt-10">
+          <div className="mb-4 flex items-baseline justify-between gap-3">
+            <h2 className="text-xl font-semibold">Movies</h2>
+            {isMe && (
+              <Link href="/search" className="text-sm text-violet-400 hover:underline">
+                Log another movie
+              </Link>
+            )}
+          </div>
+          <PosterGrid logs={posters} />
+        </section>
+      ) : (
+        <section className="mt-10 rounded-lg border border-dashed border-zinc-700 p-10 text-center">
+          <h2 className="text-lg font-semibold">Nothing logged yet</h2>
+          {isMe ? (
+            <p className="mt-2 text-zinc-400">
+              <Link href="/search" className="text-violet-400 hover:underline">
+                Search a movie
+              </Link>
+              , rate it, and it shows up here.
+            </p>
+          ) : (
+            <p className="mt-2 text-zinc-400">@{profile.username} hasn&apos;t logged anything yet.</p>
+          )}
+        </section>
+      )}
     </div>
   );
 }

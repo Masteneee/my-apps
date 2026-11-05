@@ -157,3 +157,179 @@ Answers
 1. The anon key can only do what the RLS policies allow: read profiles, and create or edit only your own.
 2. It would only match the exact URL `/u/username`, not `/u/filmfan`.
 3. So tests can give it a fake in-memory storage and run without a browser.
+
+## Stage 2: Database + movies (2026-11-05)
+
+### What we built
+You can now search for a movie, log it with a status (Want to watch, Watched, Dropped...), a rating
+from half a star to 5 stars, a review, a "watched on" date and a rewatch flag, then see it in a poster
+grid on your profile. The Movies counter on the profile is real. A second SQL file creates the rest of
+the data model from PLAN.md (`media_items`, `logs`, `lists`, `list_items`, `follows`), every table with
+Row Level Security. Lists and follows have no screens yet (Stage 5), but their tables and rules exist.
+
+Same trick as Stage 1, used twice:
+- **Logs** go through a `MediaStore` interface with a Supabase version and a localStorage demo version.
+- **Movie search** goes through a `MovieSearch` interface with a real TMDB version (when a TMDB key is
+  set) and a "saved sample" version (about a dozen famous movies, used when no key is set). The search
+  page shows a yellow "Sample data" note in that case.
+
+### New concepts
+
+**Tables that point to each other (foreign keys).** A log doesn't copy the movie's title; it stores
+`media_item_id`, the id of a row in `media_items`. `references public.media_items (id)` makes Postgres
+refuse a log that points to a movie that doesn't exist. `on delete cascade` means "if the thing I point
+to is deleted, delete me too", so deleting an account cleans up its profile, logs, lists and follows.
+
+**Constraints: letting the database say no.** `unique (source, type, source_id)` means the same TMDB
+movie is cached only once, no matter how many people log it. `check (...)` rules refuse bad values even
+if our TypeScript has a bug: the rating must be between 0.5 and 5 and `rating * 2` must be a whole
+number (that's "half steps" in math form). A primary key made of two columns, like
+`primary key (follower_id, following_id)`, means "you can follow someone only once".
+
+**Indexes.** An index is like the index at the back of a book: instead of reading every log to find
+yours, Postgres jumps straight to them. We add one for "this user's logs, newest first" (the profile
+page) and one for "all logs of this movie" (needed for average ratings in Stage 4).
+
+**RLS, part 2: `using` vs `with check`, and policies that look at another table.** Stage 1 explained
+RLS (every row locked unless a policy allows it). Two new ideas: `using (...)` decides which EXISTING
+rows you may see, update or delete; `with check (...)` decides whether a NEW or CHANGED row is allowed.
+The update policy on `logs` has both, so you can't edit someone else's log, and you can't edit yours
+to hand it to someone else. `list_items` has no `user_id`, so its policies ask "does this item's list
+belong to you?" with `exists (select 1 from lists l where l.id = list_id and l.user_id = auth.uid())`.
+Lists also show a policy that depends on the data: `is_public or auth.uid() = user_id` (public lists
+for everyone, private ones only for you).
+
+**Route Handlers: code that only runs on the server.** `app/api/movies/search/route.ts` is a URL that
+returns JSON instead of a page. The browser calls `/api/movies/search?q=interstellar`; our server then
+calls TMDB with the key and sends back the results. The key lives in `process.env.TMDB_READ_ACCESS_TOKEN`
+(no `NEXT_PUBLIC_` prefix), so Next.js never copies it into browser code. `import "server-only"` in
+`lib/tmdb/server.ts` is a safety net: the build fails if a browser component ever imports that file.
+
+**Converting outside data into our own type.** TMDB says `release_date: "2014-11-05"` and
+`poster_path: "/abc.jpg"`; our app wants `year: 2014` and a full `coverUrl`. `lib/tmdb/convert.ts` is the
+only file that knows TMDB's field names. The sample search returns data in TMDB's exact shape and goes
+through the same converter, so the sample really tests the real path. This is the start of the adapter
+pattern that Stage 3 builds on (one converter per source, all producing `MediaResult`).
+
+**Don't trust data from the internet: `unknown` and type guards.** `convertTmdbSearchResponse` takes
+`json: unknown`, which forces us to check before using it. `looksLikeMovie(value): value is TmdbMovie` is
+a "type guard": it checks the value at runtime, and if it returns true, TypeScript treats the value as a
+`TmdbMovie`. Broken entries are skipped instead of crashing the page.
+
+**Caching only what's used.** We never copy TMDB's catalog. The first time anyone logs a movie, we save
+a small copy (`media_items`) so profiles load without asking TMDB again. The Supabase store first looks
+for the cached copy, and only inserts if there is none (and if two people insert at the same moment,
+the unique rule makes one fail with code `23505`, and that one just reads the other's copy).
+
+**Fake `fetch` in tests.** `createTmdbMovieSearch(credentials, fetchFn)` takes `fetch` as a parameter
+(dependency injection again, like the storage in Stage 1). Tests pass `vi.fn(...)`, a fake that answers
+with the saved sample, and can check which URL was called. No internet, no key, same result every time.
+
+**Numbers with decimals are tricky.** In JavaScript `0.1 + 0.2` is `0.30000000000000004`, because
+computers store numbers in binary and 0.1 has no exact binary form (like 1/3 in decimal). Halves are
+safe (0.5 is exactly 1/2 in binary), so `Number.isInteger(value * 2)` is an exact "is it a half step?"
+check. If we ever wanted 0.1 steps, this trick would break and we'd compare with a small tolerance
+instead. The SQL rule is written the same way (`rating * 2 = floor(rating * 2)`), so both sides agree.
+
+**Local date vs UTC.** `new Date().toISOString()` gives the date in London's time zone (UTC). At 9 p.m. in
+Montreal that's already "tomorrow", so the "watched on" field would default to the wrong day.
+`localToday()` builds the date from `getFullYear()`, `getMonth()` and `getDate()`, which use your own
+time zone.
+
+**`useRef` for "which answer is the latest?"** If you search "matrix" then quickly "parasite", the
+answers can come back in the wrong order. `MovieSearch` numbers each request in a `useRef` (a value React
+keeps between renders without redrawing) and ignores any answer that isn't for the latest number.
+
+### New dependencies
+None. `server-only` is handled by Next.js itself, and Vitest's `vi.fn` was already installed.
+
+### Files and what each one does
+- `supabase/migrations/20261105010000_media_logs_lists_follows.sql` the 5 new tables, their rules,
+  indexes and RLS policies. Run it after the profiles file.
+- `lib/media/types.ts` `MediaResult` (a search result), `MediaItem` and `Log` (database rows), and the
+  `MediaStore` interface.
+- `lib/media/validation.ts` rating check, `validateLogInput` (all form rules in one place), dates.
+- `lib/media/display.ts` stars text, status words, "newest log per movie", counts per type.
+- `lib/media/mock.ts` the demo store (localStorage key `media-log:mock-media`).
+- `lib/media/supabase.ts` the real store, plus friendly database error messages.
+- `lib/media/index.ts` picks the store (same rule as auth).
+- `lib/supabase/client.ts` the ONE Supabase client, now shared by auth and the media store.
+- `lib/auth/supabase.ts`, `lib/auth/index.ts` changed to use that shared client instead of making their own.
+- `lib/tmdb/types.ts` the shape of TMDB's search answer.
+- `lib/tmdb/convert.ts` TMDB answer -> `MediaResult[]`.
+- `lib/tmdb/search.ts` the `MovieSearch` interface, the real TMDB search, the sample search, and
+  building the TMDB request (token in a header, or API key in the URL).
+- `lib/tmdb/sample-search-response.json` the saved sample: 13 movies in TMDB's exact format.
+- `lib/tmdb/server.ts` server-only: reads the TMDB key from the environment and picks real or sample.
+- `lib/**/*.test.ts` 54 new tests (93 in total): converter, TMDB request + fake fetch, sample search,
+  rating and log validation, the demo store, display helpers.
+- `app/api/movies/search/route.ts` the route handler `GET /api/movies/search?q=...`.
+- `app/search/page.tsx` the `/search` page.
+- `components/MovieSearch.tsx` search box, sample-data note, results, success message.
+- `components/LogMovieForm.tsx` status, rating, date, rewatch, review.
+- `components/Poster.tsx` a poster image that falls back to the title if it can't load.
+- `components/PosterGrid.tsx` the profile's poster grid.
+- `components/ProfileView.tsx` now loads the user's logs: real counters and the grid.
+- `components/NavBar.tsx` new "Search" link. `components/DemoBanner.tsx` mentions logs.
+- `.env.example` new `TMDB_READ_ACCESS_TOKEN` and `TMDB_API_KEY`.
+
+### Most important lines
+```sql
+rating numeric check (rating between 0.5 and 5 and rating * 2 = floor(rating * 2)),
+```
+In the migration: the database itself refuses 3.3 stars or 7 stars, whatever the browser sends.
+
+```ts
+return credentials ? createTmdbMovieSearch(credentials) : createSampleMovieSearch();
+```
+In `lib/tmdb/server.ts`: one line decides real TMDB or the sample. The page never knows the difference,
+except for the `usesSample` flag that shows the note.
+
+```ts
+const LOG_WITH_MEDIA_COLUMNS = `${LOG_COLUMNS}, media:media_items(${MEDIA_COLUMNS})`;
+```
+In `lib/media/supabase.ts`: one request gets the logs AND the movie each one points to (Supabase follows
+the foreign key for us), instead of one extra request per poster.
+
+### Decisions
+- `media_items` is unique on `(source, type, source_id)`, not `(source, source_id)` as PLAN.md says,
+  because TMDB numbers movies and series separately (movie 550 and series 550 are different things).
+- Logging the same movie twice makes two diary entries (that's what a rewatch is). The poster grid and
+  the counter show each movie once, using the newest log.
+- You can't rate a movie marked "Want to watch". The watched date and rewatch flag are only kept for
+  "Watched".
+- Logs and follows are readable by everyone (public diaries, like Letterboxd). Private lists are only
+  readable by their owner.
+- Any logged-in user may add to `media_items`, but nobody can edit or delete a cached item, since other
+  people's logs point to it.
+- `creators` is empty for movies for now: TMDB's search answer has no director (it needs a second
+  request per movie). Stage 3 or 4 can fill it.
+- Posters use a plain `<img>`, not Next.js's `<Image>`, to avoid extra config. Stage 7 is the
+  performance pass.
+- The sample's numbers (popularity, votes) are approximate, and the overviews are written by us.
+  The poster addresses are real TMDB paths as far as we know, but couldn't be checked offline; a broken
+  one just shows the title.
+- TMDB's terms ask for a credit line, so the search page has one.
+
+### Practice exercise
+Add a movie to the sample: in `lib/tmdb/sample-search-response.json`, copy one movie block and change it
+to *Amélie* (`"id": 194`, `"title": "Amélie"`, `"original_title": "Le Fabuleux Destin d'Amélie Poulain"`,
+`"release_date": "2001-04-25"`, `"original_language": "fr"`, `"poster_path": null`). Don't forget the
+comma between blocks and update `total_results`. Then add a test in `lib/tmdb/search.test.ts` checking
+that searching `amelie` (no accent!) finds it, and run `npm test`. Bonus: why does the poster show the
+title instead of an image? (Look at `posterUrl` and `Poster.tsx`.)
+
+### Quiz
+1. Why does the browser call `/api/movies/search` instead of calling TMDB directly?
+2. A hacker sends `insert into logs (user_id, ...) values ('<your id>', ...)` with their own login.
+   What stops it?
+3. Why does the sample search go through `convertTmdbSearchResponse` instead of returning
+   `MediaResult`s directly?
+
+Answers
+1. Calling TMDB from the browser would need the key in the browser, where anyone can read it. The route
+   handler keeps it on the server.
+2. The insert policy on `logs`: `with check ((select auth.uid()) = user_id)`. Their `auth.uid()` isn't
+   your id, so the row is refused.
+3. So the sample exercises the exact same code as the real API. If the converter breaks, sample mode
+   breaks too, and the tests catch it.

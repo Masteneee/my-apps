@@ -3,6 +3,7 @@
 // supabase.ts themselves.
 
 import { createMemoryStorage, createMockAuthService } from "./mock";
+import { getSupabaseClient } from "../supabase/client";
 import { createSupabaseAuthService } from "./supabase";
 import type { AuthMode, AuthService } from "./types";
 
@@ -29,7 +30,7 @@ export function getAuthService(): AuthService {
   if (service) return service;
 
   if (authMode === "supabase") {
-    service = createSupabaseAuthService(SUPABASE_URL!, SUPABASE_ANON_KEY!);
+    service = createSupabaseAuthService(getSupabaseClient());
   } else {
     // localStorage only exists in the browser. On the server (during the
     // build or the first render) we fall back to a throwaway in-memory store.
