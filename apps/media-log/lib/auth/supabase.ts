@@ -123,6 +123,16 @@ export function createSupabaseAuthService(supabase: SupabaseClient): AuthService
       return (data as Profile | null) ?? null;
     },
 
+    async listProfiles(limit = 20) {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select(PROFILE_COLUMNS)
+        .order("created_at", { ascending: false })
+        .limit(limit);
+      if (error) throw new Error(friendlySupabaseError(error));
+      return data as Profile[];
+    },
+
     async createProfile(input: NewProfile) {
       const { data: sessionData } = await supabase.auth.getSession();
       const user = sessionData.session?.user;

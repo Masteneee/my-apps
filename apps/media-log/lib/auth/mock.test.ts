@@ -104,6 +104,16 @@ describe("mock auth: profiles", () => {
     expect(profile.display_name).toBeNull();
   });
 
+  it("lists profiles newest first, up to a limit (Stage 5: people to follow)", async () => {
+    expect(await auth.listProfiles()).toEqual([]);
+    for (const name of ["first", "second", "third"]) {
+      await auth.signUp(`${name}@example.com`, "secret1");
+      await auth.createProfile({ username: name });
+    }
+    expect((await auth.listProfiles()).map((p) => p.username)).toEqual(["third", "second", "first"]);
+    expect((await auth.listProfiles(2)).map((p) => p.username)).toEqual(["third", "second"]);
+  });
+
   it("returns null for a username nobody has", async () => {
     expect(await auth.getProfileByUsername("ghost")).toBeNull();
   });

@@ -2,6 +2,8 @@
 // Same idea as lib/auth/types.ts: pages only talk to `MediaStore`, so the
 // localStorage demo store and the Supabase store are interchangeable.
 
+import type { Profile } from "../auth/types";
+
 // `as const` makes TypeScript remember the exact strings, so we can build a
 // type from the list below ("movie" | "series" | ...) AND loop over it at runtime.
 // KEEP IN SYNC with the `check` constraints in supabase/migrations/*_media_logs_lists_follows.sql.
@@ -104,6 +106,63 @@ export type MediaItemRef = {
   sourceId: string;
 };
 
+// ---------------------------------------------------------------------------
+// Stage 5: social (follows, feed, review likes, lists)
+// ---------------------------------------------------------------------------
+
+/** The public part of a profile, shown next to someone's log, review or list. */
+export type PublicProfile = Pick<Profile, "id" | "username" | "display_name" | "avatar_url">;
+
+/** One row of `review_likes` (Stage 5 migration): "this user liked this review". */
+export type ReviewLike = {
+  user_id: string;
+  log_id: string;
+};
+
+/**
+ * A log as the feed and the reviews section show it: with its item, WHO wrote
+ * it, and its likes. `likeCount` and `likedByMe` are camelCase because they are
+ * worked out by our code (attachSocial in ./feed.ts), not columns in the database.
+ */
+export type SocialLog = LogWithMedia & {
+  author: PublicProfile;
+  likeCount: number;
+  likedByMe: boolean;
+};
+
+/** One row of `lists` (Stage 2 migration). */
+export type MediaList = {
+  id: string;
+  user_id: string;
+  title: string;
+  description: string | null;
+  is_public: boolean;
+  created_at: string; // ISO date-time
+};
+
+/** One row of `list_items`: which item is in which list, at which place (0 = first). */
+export type ListItem = {
+  list_id: string;
+  media_item_id: string;
+  position: number;
+  note: string | null;
+};
+
+export type ListItemWithMedia = ListItem & { media: MediaItem };
+
+/** A list with its owner and its items, already sorted by position. */
+export type ListWithItems = MediaList & {
+  author: PublicProfile;
+  items: ListItemWithMedia[];
+};
+
+/** What the "new list" form sends. Checked by validateListInput() in ./lists.ts. */
+export type NewListInput = {
+  title: string;
+  description: string;
+  isPublic: boolean;
+};
+
 export type MediaStoreMode = "supabase" | "mock";
 
 export interface MediaStore {
@@ -129,4 +188,41 @@ export interface MediaStore {
    * Throws a friendly Error if it's not yours or the values are wrong.
    */
   updateLog(logId: string, change: LogUpdateInput): Promise<LogWithMedia>;
+
+  // ----- Stage 5: follows -----
+
+  /** The signed-in user starts following `userId`. Following twice is fine (nothing changes). */
+  follow(userId: string): Promise<void>;
+  unfollow(userId: string): Promise<void>;
+  /** The ids of the people `userId` follows. */
+  getFollowing(userId: string): Promise<string[]>;
+  /** The ids of the people who follow `userId`. */
+  getFollowers(userId: string): Promise<string[]>;
+
+  // ----- Stage 5: feed and review likes -----
+
+  /** What the people YOU follow logged, newest first (at most FEED_LIMIT). Empty when signed out. */
+  getFeed(): Promise<SocialLog[]>;
+  /** Everyone's logs of an item that have a review, newest first, with likes. */
+  getReviewsForItem(mediaItemId: string): Promise<SocialLog[]>;
+  /** Like someone else's review. Liking twice is fine. Throws if it's your own or has no review. */
+  likeReview(logId: string): Promise<void>;
+  unlikeReview(logId: string): Promise<void>;
+
+  // ----- Stage 5: lists -----
+
+  createList(input: NewListInput): Promise<MediaList>;
+  /** A user's lists, newest first. Other people only see the public ones. */
+  getListsForUser(userId: string): Promise<ListWithItems[]>;
+  /** One list, or null if it doesn't exist or is someone else's private list. */
+  getList(listId: string): Promise<ListWithItems | null>;
+  deleteList(listId: string): Promise<void>;
+  /** Adds an item at the END of one of your lists (caching the item first if needed). */
+  addToList(listId: string, media: MediaResult): Promise<ListWithItems>;
+  removeFromList(listId: string, mediaItemId: string): Promise<ListWithItems>;
+  /**
+   * Saves a new order: `orderedMediaItemIds` lists EVERY item of the list, first
+   * to last. Throws if an item is missing or extra (e.g. changed in another tab).
+   */
+  reorderList(listId: string, orderedMediaItemIds: string[]): Promise<ListWithItems>;
 }

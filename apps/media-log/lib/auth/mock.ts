@@ -14,10 +14,11 @@ import { normalizeUsername, validateCredentials, validateDisplayName, validateUs
 /** The two methods we need from localStorage. Tests pass a simple in-memory version. */
 export type KeyValueStorage = Pick<Storage, "getItem" | "setItem">;
 
-type MockUser = AuthUser & { password: string };
+export type MockUser = AuthUser & { password: string };
 
 // Everything the mock "database" holds, saved as one JSON string.
-type MockDatabase = {
+// Exported so the demo people seed (lib/demo/seed.ts) can add accounts to it.
+export type MockDatabase = {
   users: MockUser[];
   profiles: Profile[];
   currentUserId: string | null; // who is signed in right now (the "session")
@@ -142,6 +143,11 @@ export function createMockAuthService(
 
     async getProfileForUser(userId) {
       return load().profiles.find((p) => p.id === userId) ?? null;
+    },
+
+    async listProfiles(limit = 20) {
+      // New profiles are pushed at the end, so reversing puts the newest first.
+      return [...load().profiles].reverse().slice(0, limit);
     },
 
     async createProfile(input: NewProfile) {

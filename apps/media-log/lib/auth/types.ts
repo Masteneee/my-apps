@@ -51,6 +51,8 @@ export interface AuthService {
 
   getProfileByUsername(username: string): Promise<Profile | null>;
   getProfileForUser(userId: string): Promise<Profile | null>;
+  /** Up to `limit` profiles, newest accounts first (Stage 5: "people to follow"). */
+  listProfiles(limit?: number): Promise<Profile[]>;
   /** Creates the profile of the signed-in user. Throws a friendly Error on failure. */
   createProfile(input: NewProfile): Promise<Profile>;
 }

@@ -44,6 +44,11 @@ export function NavBar() {
 
           {status === "signed-in" && !profileLoading && (
             <>
+              {profile && (
+                <Link href="/feed" className="rounded-md px-3 py-2 text-zinc-300 hover:bg-zinc-800 hover:text-white">
+                  Feed
+                </Link>
+              )}
               <Link
                 href={profile ? `/u/${profile.username}` : "/onboarding"}
                 className="rounded-md px-3 py-2 text-zinc-300 hover:bg-zinc-800 hover:text-white"

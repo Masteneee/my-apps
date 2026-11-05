@@ -4,12 +4,17 @@ One place to log, rate and review everything you watch, read and play: movies, s
 books and games. Think Letterboxd, but for every kind of media, with one profile. See `PLAN.md` for
 the full plan and `LEARNING.md` for what each stage taught.
 
-**Status:** Stage 4 (tracking + diary) done. One search bar finds movies and series (TMDB), anime and manga
+**Status:** Stage 5 (social) done. One search bar finds movies and series (TMDB), anime and manga
 (AniList), books (Open Library) and games (IGDB), merged into one list without duplicates. You can log any
 of them with a status, rating, review and **progress** (episode 7/24, chapter 120/?, 45% of a book, 12.5
 hours in a game), see them grouped by type on your profile at `/u/username`, read your **diary** (every log,
 grouped by month) at `/u/username/diary`, and open any logged item's page at `/media/<type>/<source>-<id>`
-(cover, info, your log with a progress tracker, everyone's average rating).
+(cover, info, your log with a progress tracker, everyone's average rating, everyone's reviews).
+
+**Social (Stage 5):** follow people, read your **feed** at `/feed` (what the people you follow logged and
+reviewed), **like** reviews, and make public or private **lists** at `/u/username/lists` that you reorder by
+dragging (or with ↑ ↓ buttons on phones and keyboards). In demo mode, the feed page can add 3 clearly labeled
+**demo people** so there's someone to follow.
 
 ## Run it
 
@@ -43,8 +48,10 @@ touches this folder.
 2. SQL Editor > New query > paste `supabase/migrations/20261105000000_profiles.sql` > Run. Then do the
    same with `supabase/migrations/20261105010000_media_logs_lists_follows.sql` (order matters: the second
    file points to the `profiles` table), then `supabase/migrations/20261105020000_progress_units.sql`
-   (Stage 4: adds `logs.progress_unit` and lets `progress` hold 12.5 hours). Table Editor should now show 6
-   tables, each marked "RLS enabled", and `logs` should have a `progress_unit` column.
+   (Stage 4: adds `logs.progress_unit` and lets `progress` hold 12.5 hours), then
+   `supabase/migrations/20261105030000_review_likes.sql` (Stage 5: likes on reviews). Table Editor should now
+   show 7 tables, each marked "RLS enabled", `logs` should have a `progress_unit` column, and there should be
+   a `review_likes` table.
 3. Project Settings > API: copy the Project URL and the anon (or "publishable") key.
 4. `cp .env.example .env.local` and paste them in. Never use the `service_role` / secret key here.
 5. Authentication > URL Configuration: Site URL `http://localhost:3000`, and add
@@ -146,8 +153,31 @@ offline).
     "Watched on" date goes under THAT month. Open `/media/movie/tmdb-1`: "Not in Media Log yet".
     `/media/podcast/x`: the 404 page.
 
-To reset demo data: DevTools > Application > Local Storage > delete `media-log:mock-db` (accounts) and
-`media-log:mock-media` (logs).
+22. **Feed + demo people (Stage 5).** Click **Feed** in the nav bar: "You don't follow anyone yet", and an
+    amber **Demo mode** box. Press **Add demo people**: Aiko, Leo and Sam (demo) appear under "People to follow"
+    and the box now shows their login instead of the button (adding them twice isn't possible).
+23. **Follow** Aiko: the feed fills with her logs, newest first: "Aiko (demo) watched Frieren ★★★★★" with her
+    review, "is reading Planetes · Chapter 14/26", "rewatched Spirited Away". Leo's logs aren't there (not followed).
+24. **Like** the Frieren review: ♡ 2 becomes ♥ 3. Reload: still 3. Press again: back to 2.
+25. Open Aiko's profile (click her name): "3 followers · 1 following" and a **Following** button. Press it
+    (unfollow): "2 followers" and **Follow**. Follow her again. Your own profile shows no Follow button.
+26. **Lists:** on her profile, click **Lists** > "Best anime for people who don't watch anime": 5 items in order,
+    no ↑ ↓ buttons (not yours). Then open your own profile > **Lists** (or `/u/<you>/lists`), create
+    "Best sci-fi": you land on the empty list. Search `interstellar` in its box > **Add**, then `arrival` and
+    `project hail mary`. They appear in that order, numbered 1 to 3.
+27. **Reorder:** press ↑ on Project Hail Mary (it becomes 2nd). Drag Arrival's row onto the first row (a violet
+    line shows where it lands): Arrival is 1st. Reload: the order stayed. Tab to a ↓ button and press Enter: it
+    works with the keyboard too. Press ✕ to remove one. At phone width the ↑ ↓ ✕ buttons still fit.
+28. **Reviews + Add to list on item pages:** open `/media/anime/anilist-154587` (Frieren): a **Reviews** section
+    with Aiko's review and its likes. Pick "Best sci-fi" in **Add to list** > Add > "Added to...". On
+    `/media/movie/tmdb-157336` (Interstellar), **Log it** with a review: under Reviews, yours shows "♥ 0" with no
+    button (you can't like your own), Leo's has one.
+29. **Private lists:** create a list with "Public" unticked, copy its URL, log out, log in as
+    `leo@demo.test` / `demo-password`. The private URL says "List not found", and `/u/<you>/lists` only shows the
+    public one. As Leo you can like YOUR review on Interstellar.
+
+To reset demo data: DevTools > Application > Local Storage > delete `media-log:mock-db` (accounts, including
+the demo people) and `media-log:mock-media` (logs, follows, likes, lists).
 
 ## How it's organised
 
@@ -156,11 +186,18 @@ app/                 pages (folder = URL), layout, global CSS
 app/api/             route handlers: server-only URLs that answer JSON (/api/search)
 app/media/[type]/[id]/  the item page (/media/anime/anilist-16498)
 app/u/[username]/diary/ the diary page
+app/u/[username]/lists/ someone's lists (Stage 5)
+app/lists/[id]/      one list, with drag-to-reorder for its owner
+app/feed/            the home feed
 components/          React components (forms, nav bar, profile, diary, item page, progress tracker, search,
-                     poster grid, AuthProvider, useProfileLogs hook)
+                     poster grid, AuthProvider, useProfileLogs hook; Stage 5: feed, follow and like
+                     buttons, review cards, lists, list editor, add to list)
 lib/auth/            the AuthService interface + mock and Supabase backends + validation (+ tests)
-lib/media/           the MediaStore interface (logs) + mock and Supabase stores + log validation, progress
-                     math (progress.ts), diary grouping (diary.ts), item page links (links.ts) (+ tests)
+lib/media/           the MediaStore interface (logs, follows, likes, lists) + mock and Supabase stores + log
+                     validation, progress math (progress.ts), diary grouping (diary.ts), item page links
+                     (links.ts), feed building + like rules (feed.ts), list order math (reorder.ts), list
+                     checks (lists.ts) (+ tests)
+lib/demo/            demo mode only: the 3 labeled demo people (seed.ts) (+ tests)
 lib/sources/         one adapter per search source (tmdb, anilist, openlibrary, igdb), merging + dedup,
                      the unified search, env setup, saved sample answers in samples/ (+ tests)
 lib/supabase/        the one shared Supabase client
@@ -186,3 +223,9 @@ Item page: `/media/<type>/<source>-<source id>` (e.g. `/media/book/openlibrary-O
 (`components/MediaItemView.tsx`) asks the store for the cached item (`getMediaItem`) and everyone's logs of it
 (`getLogsForItem`), and the tracker saves with `updateLog`. Only items someone has logged exist there (we
 never copy whole catalogs); others show "Not in Media Log yet".
+
+Social (Stage 5): the feed page calls `getFeed()`. With Supabase, that's "who do I follow?" (`follows`), then
+"their 50 newest logs, with item and author" (`logs` + `media_items` + `profiles` in one request), then "all
+likes of those logs" (`review_likes`, one request). The pure functions in `lib/media/feed.ts` count the likes and
+glue it together; the demo store runs the same functions on its localStorage data. A list's order is the
+`position` column of `list_items`; `lib/media/reorder.ts` works out the new order and which rows to save.

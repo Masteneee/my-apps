@@ -121,6 +121,15 @@ describe("friendlyMediaError", () => {
     );
     expect(friendlyMediaError({ code: "something_new", message: "Original text" })).toBe("Original text");
   });
+
+  it("points to the Stage 5 migration when the likes table is missing (Stage 5)", () => {
+    expect(
+      friendlyMediaError({ code: "PGRST205", message: "Could not find the table 'public.review_likes' in the schema cache" }),
+    ).toContain("Stage 5");
+    // Any other missing table still points to Stage 2.
+    expect(friendlyMediaError({ code: "PGRST205", message: "Could not find the table 'public.logs'" })).toContain("Stage 2");
+    expect(friendlyMediaError({ code: "22P02", message: "invalid input syntax for type uuid" })).toContain("link");
+  });
 });
 
 describe("averageRating (everyone's average on the item page)", () => {

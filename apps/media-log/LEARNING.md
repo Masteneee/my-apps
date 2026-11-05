@@ -697,3 +697,174 @@ Answers
    The app checks it in `validateProgress` (a database "trigger" could, but that's more advanced).
 3. "★ 4.0 average from 2 ratings": each person counts once with their LATEST rating, so (5 + 3) / 2 = 4.
    3.3 would be (2 + 5 + 3) / 3, counting Ana twice.
+
+## Stage 5: Social (2026-11-05)
+
+### What we built
+- **Follows.** A Follow button and "3 followers · 1 following" on every profile, and a "People to follow" list
+  on the feed page.
+- **Home feed** `/feed` (the **Feed** link in the nav bar): what the people you follow logged and reviewed,
+  newest first ("Aiko watched Frieren ★★★★★", "Leo is watching Severance · Episode 6"), with their reviews.
+- **Likes on reviews.** A ♡ under every review, in the feed and in a new **Reviews** section on item pages.
+  You can't like your own review, or a log without a review.
+- **Lists** `/u/<username>/lists` and `/lists/<id>`: make a public or private list ("Best anime for people
+  who don't watch anime"), add items with the search box on the list page or "Add to list" on an item page,
+  reorder by **dragging** a row or with the **↑ ↓** buttons (phones and keyboard), remove items, delete the list.
+- **Demo people.** In demo mode the feed page has an "Add demo people" button: 3 made-up, clearly labeled
+  people (`demo_aiko`, `demo_leo`, `demo_sam`) with logs, reviews, likes and a list, so you have someone to follow.
+- Everything works in demo mode (localStorage) AND with Supabase, through the same `MediaStore` interface.
+
+### The plan we followed
+1. A new migration for the one missing table, `review_likes`, with RLS (`follows`, `lists`, `list_items` exist since Stage 2).
+2. New `MediaStore` methods for follows, feed, likes and lists, plus `listProfiles` on `AuthService`.
+3. The logic as pure functions: the feed (`feed.ts`), the ordering (`reorder.ts`), list checks (`lists.ts`).
+4. Both stores implement the methods; the demo store mirrors every RLS rule.
+5. The demo people seed (`lib/demo/seed.ts`), behind a labeled button.
+6. The pages: feed, follow button, likes, reviews, lists, drag-to-reorder.
+7. Tests for every rule, then a click-through in a headless browser (31 checks, all passing).
+
+### New concepts
+
+**Join tables (many-to-many).** One person follows many people, and is followed by many. That can't be one
+column, so `follows` is a table of pairs: `(follower_id, following_id)`. `review_likes` (who liked which review)
+and `list_items` (which item is in which list) are the same idea. Their primary key is the PAIR, which is how
+the database says "you can follow someone only once".
+
+**Policies that look at other tables.** In Stage 4 a `check` couldn't refuse "episode 30 of 24" because the
+total is in another table. An RLS policy can: the insert policy on `review_likes` says
+`exists (select 1 from logs where id = log_id and review_text is not null and user_id <> auth.uid())`, i.e.
+"there is such a log, it has a review, and it isn't yours". The app checks the same rules with `likeProblem()`
+to give a friendly sentence, because the database can only answer "no" (error 42501), not why.
+
+**Building a feed ("fan-out on read").** The feed isn't stored anywhere. When you open it, we ask "logs whose
+author is in the list of people I follow, newest first, 50 at most" (`.in("user_id", following)`). Big apps
+like Twitter copy each post into every follower's feed when it's written ("fan-out on write") because millions
+of people read at once. For us, one query with an index (`logs (user_id, created_at desc)`) is plenty.
+
+**Avoiding one request per row (the "N+1 problem").** To show like counts for 50 feed entries, asking the
+database 50 times would be slow. Instead we ask once for "all likes of these 50 logs" (`.in("log_id", ids)`)
+and count them in JavaScript with `summarizeLikes()`. `attachSocial()` then glues logs, authors and likes
+together, like a database "join" done by hand. Pure function, so it's tested with plain arrays.
+
+**Optimistic updates.** When you press ♡, the count changes instantly, before the database answers. If saving
+fails, we put the old count back and show the reason. The reorder does the same: the row moves at once, then
+it saves. It makes the app feel fast, at the cost of a small "undo" path for errors.
+
+**Idempotent actions.** "Idempotent" means doing it twice gives the same result as doing it once. Following
+someone you already follow, or liking twice, changes nothing: the Supabase store ignores error `23505`
+("already exists"), and the demo store checks first. The seed is idempotent too: the second click does nothing.
+This matters because users double-click and networks retry.
+
+**Storing an order.** A list's order lives in `list_items.position` (0, 1, 2...). To show the list we SORT by
+position (`sortByPosition`), so gaps are fine: removing item 1 of 0-1-2 leaves 0-2, still in order. After a
+reorder, `positionChanges()` gives the new positions 0, 1, 2... but returns only the rows that CHANGED, so
+swapping two items saves two rows. It also refuses an order that doesn't match the list (changed in another tab).
+
+**Immutable arrays.** `moveItem(items, from, to)` copies the array, then uses `splice` to cut one element out and
+put it back elsewhere. It never changes the array it was given. React only redraws when it gets a NEW array
+(it compares by reference), so changing the old one in place would show nothing.
+
+**HTML drag and drop (built into browsers).** A row with `draggable` fires `dragstart` when you grab it (we
+remember its index), `dragover` while something is dragged over another row (we must call `preventDefault()` to
+say "you may drop here", browsers refuse drops by default), `drop` when you let go (we call `moveItem`), and
+`dragend` at the end (we clear the highlight). Firefox needs `dataTransfer.setData(...)` or the drag never starts.
+
+**Accessible alternatives.** Native drag doesn't work well on phones and can't be done with a keyboard, so each
+row also has ↑ and ↓ buttons. They are real `<button>`s, so Tab + Enter works, and `aria-label="Move Arrival up"`
+tells a screen reader what "↑" means. Follow and like are on/off buttons, so they say so with `aria-pressed`.
+
+**Seed data, and a test that it doesn't drift.** The demo people's items are copied from the saved search
+samples, so if you log Interstellar yourself, your log and Leo's point to the SAME cached item. A test converts
+the samples with the real adapters and checks every demo item still matches: if someone edits a sample, the test
+says which demo item to update. Every demo log also goes through `validateLogInput`, so it can't be something a
+real user couldn't save.
+
+### New dependencies
+None. Drag-to-reorder uses the browser's own drag and drop. A library like dnd-kit would add touch dragging and
+animations, but the ↑ ↓ buttons already cover phones and keyboards, so it wouldn't save real work. (The browser
+click-through used the Playwright already installed on the machine, from a throwaway script outside the app.)
+
+### Files and what each one does
+- `supabase/migrations/20261105030000_review_likes.sql` (new) the `review_likes` table, its index and RLS policies.
+- `lib/media/feed.ts` (new) `buildFeed`, `newestFirst`, `summarizeLikes`, `attachSocial`, `applyLikeChange`,
+  `hasReview`, `likeProblem`, `feedAction` ("is reading", "rewatched"...), `displayName`. Tests: `feed.test.ts`.
+- `lib/media/reorder.ts` (new) `moveItem`, `moveUp`, `moveDown`, `sortByPosition`, `nextPosition`, `sameIds`,
+  `positionChanges`. Tests: `reorder.test.ts`.
+- `lib/media/lists.ts` (new) `validateListInput`, `itemCountLabel`. Tests: `lists.test.ts`.
+- `lib/media/types.ts` `PublicProfile`, `ReviewLike`, `SocialLog`, `MediaList`, `ListItem`, `ListWithItems`,
+  `NewListInput`, and 15 new `MediaStore` methods.
+- `lib/media/mock.ts` the demo store: follows, likes, lists and list items in localStorage, every RLS rule mirrored;
+  loads saves from before Stage 5. Tests: `mock-social.test.ts` (new).
+- `lib/media/supabase.ts` the same methods on the real tables (`author:profiles(...)` joins, one likes request per page).
+- `lib/media/index.ts` gives the demo store a way to read profiles.
+- `lib/auth/types.ts`, `mock.ts`, `supabase.ts` `listProfiles()` for "People to follow".
+- `lib/demo/seed.ts` (new) the 3 demo people, their logs, likes, follows and list; `seedDemoPeople`, `hasDemoPeople`.
+  Tests: `seed.test.ts`.
+- `app/feed/page.tsx`, `app/u/[username]/lists/page.tsx`, `app/lists/[id]/page.tsx` (new) the three new pages.
+- `components/FeedView.tsx` (new) the feed, People to follow, the demo box. `components/SocialLogCard.tsx` (new)
+  one feed line or review. `components/LikeButton.tsx`, `FollowButton.tsx`, `Avatar.tsx` (new).
+- `components/ListsView.tsx`, `NewListForm.tsx`, `ListView.tsx` (drag + ↑ ↓), `ListAddSearch.tsx`, `AddToList.tsx` (new).
+- `components/ProfileView.tsx` follower counts, Follow button, Lists link. `components/MediaItemView.tsx` Reviews
+  section and Add to list. `components/NavBar.tsx` Feed link.
+- Tests updated: `display.test.ts` (Stage 5 error messages), `lib/auth/mock.test.ts` (`listProfiles`).
+
+Tests: 321 in 22 files (259 in 17 before this stage).
+
+### Most important lines
+```sql
+and exists (select 1 from public.logs l where l.id = log_id and l.review_text is not null and l.user_id <> (select auth.uid()))
+```
+In the `review_likes` insert policy: the database itself refuses likes on your own review or on a log without
+one, even if someone skips our JavaScript and calls the API directly.
+
+```ts
+.filter((row) => oldPosition.get(row.media_item_id) !== row.position);
+```
+In `positionChanges` (`lib/media/reorder.ts`): after a reorder, only save the rows that actually moved.
+
+```ts
+if (dragIndex === null) return; // something else is dragged (a file, text...)
+event.preventDefault();
+```
+In `ListView.tsx`: without `preventDefault()` in `dragover`, the browser never fires `drop`.
+
+### Decisions
+- **One store interface.** Follows, feed, likes and lists are new methods on `MediaStore` (not a second store),
+  because they need the same logs and media items, and the pages already know `getMediaStore()`.
+- **The feed is at `/feed`**, not on the home page: `/` stays the landing page for visitors. 50 newest entries,
+  no "load more" yet.
+- **Likes only on written reviews, never your own**, checked in three places: the button (hidden), the store
+  (friendly error) and the database policy (the real lock).
+- **Reorder saves one small update per moved row**, sent at the same time. It's not one atomic step: if the
+  connection drops halfway, two items could share a position (still sorted, just tied). A Postgres function
+  (`rpc`) could do it atomically; that's more advanced, for later. The ↑ ↓ buttons and dragging are disabled
+  while saving, so two saves never overlap.
+- **Removing an item leaves a gap** in positions; the next reorder closes it.
+- **Demo people instead of "sign up a second account"**: one click gives a feed with reviews, likes and a list.
+  Signing up a second account in the same browser still works too. They are labeled everywhere ("(demo)",
+  `demo_` usernames, bio "not a real person"), only exist in demo mode, and you can log in as them
+  (`aiko@demo.test`, `leo@demo.test`, `sam@demo.test`, password `demo-password`) to like YOUR reviews.
+- **"People to follow" is just the 20 newest profiles.** Searching people is for later.
+- **Follower counts load the id lists**: fine for a hobby app; with thousands of followers we'd ask Postgres for a count.
+- **List notes**: the `note` column exists and is shown when set, but there's no way to type one yet (see the exercise).
+- **Not tested against a real Supabase project** (no internet here). Demo mode was clicked through in a headless browser.
+
+### Practice exercise
+Add a **"Move to top"** button to lists. In `lib/media/reorder.ts`, write `moveToTop(items, index)` using
+`moveItem`. Add tests in `reorder.test.ts`: `["a","b","c"]` with index 2 gives `["c","a","b"]`, index 0 changes
+nothing, and the old array is unchanged. Then in `components/ListView.tsx`, add a `⤒` button before ↑ that calls
+`saveOrder(moveToTop(items, index))`, with `aria-label={`Move ${item.media.title} to the top`}` and disabled for
+the first row. Run `npm test`, then try it on one of your lists. Bonus: how many rows does `positionChanges`
+save when you move the 5th of 5 items to the top? Why?
+
+### Quiz
+1. Why is the primary key of `follows` the pair `(follower_id, following_id)` instead of a separate `id`?
+2. The like button is hidden on your own reviews. Why does the database policy still check it?
+3. You remove the 2nd item of a 4-item list. What are the positions now, and why is the list still in the right order?
+
+Answers
+1. The pair IS what makes a follow unique: with it as the primary key, the database refuses following the same
+   person twice. A separate `id` would allow duplicates unless we added a unique rule anyway.
+2. The browser runs code the user controls: anyone can call the Supabase API directly with the public anon key.
+   Hiding a button is for comfort; RLS is the real lock.
+3. 0, 2, 3. We always sort by position, and 0 < 2 < 3 is still the right order. The gap closes at the next reorder.

@@ -8,7 +8,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import { getMediaStore, type LogWithMedia } from "@/lib/media";
+import { getMediaStore, type LogWithMedia, type SocialLog } from "@/lib/media";
 import {
   averageRating,
   formatAverage,
@@ -19,18 +19,22 @@ import {
   unitsLabel,
 } from "@/lib/media/display";
 import { diaryDate, formatShortDate } from "@/lib/media/diary";
+import { applyLikeChange } from "@/lib/media/feed";
 import type { MediaItem, MediaItemRef } from "@/lib/media/types";
 import { mediaItemToResult } from "@/lib/media/validation";
+import { AddToList } from "./AddToList";
 import { useAuth } from "./AuthProvider";
 import { LogMediaForm } from "./LogMediaForm";
 import { Poster } from "./Poster";
 import { ProgressTracker } from "./ProgressTracker";
+import { SocialLogCard } from "./SocialLogCard";
 
 // What we loaded, and for which item (same "stale answer" trick as the profile page).
 type Loaded = {
   key: string;
   item: MediaItem | null; // null = nobody has logged it yet, so it isn't cached
   logs: LogWithMedia[]; // everyone's, newest first
+  reviews: SocialLog[]; // everyone's logs WITH a review, with authors and likes (Stage 5)
   error: string | null;
 };
 
@@ -39,8 +43,10 @@ const keyOf = (ref: MediaItemRef) => `${ref.type}/${ref.source}/${ref.sourceId}`
 async function loadItem(ref: MediaItemRef): Promise<Loaded> {
   const store = getMediaStore();
   const item = await store.getMediaItem(ref);
-  const logs = item ? await store.getLogsForItem(item.id) : [];
-  return { key: keyOf(ref), item, logs, error: null };
+  if (!item) return { key: keyOf(ref), item, logs: [], reviews: [], error: null };
+  // Both at the same time (Promise.all), since neither needs the other.
+  const [logs, reviews] = await Promise.all([store.getLogsForItem(item.id), store.getReviewsForItem(item.id)]);
+  return { key: keyOf(ref), item, logs, reviews, error: null };
 }
 
 export function MediaItemView({ itemRef }: { itemRef: MediaItemRef }) {
@@ -63,7 +69,7 @@ export function MediaItemView({ itemRef }: { itemRef: MediaItemRef }) {
       })
       .catch((err: unknown) => {
         const message = err instanceof Error ? err.message : "Could not load this item.";
-        if (!cancelled) setLoaded({ key: keyOf(ref), item: null, logs: [], error: message });
+        if (!cancelled) setLoaded({ key: keyOf(ref), item: null, logs: [], reviews: [], error: message });
       });
     // The "cleanup": if the item changes before the answer arrives, ignore the old answer.
     return () => {
@@ -82,7 +88,7 @@ export function MediaItemView({ itemRef }: { itemRef: MediaItemRef }) {
     );
   }
 
-  const { item, logs } = loaded;
+  const { item, logs, reviews } = loaded;
   if (!item) {
     return (
       <div className="py-16 text-center">
@@ -225,6 +231,36 @@ export function MediaItemView({ itemRef }: { itemRef: MediaItemRef }) {
               See my diary
             </Link>
           </p>
+        )}
+        {canLog && user && profile && (
+          <div className="mt-6">
+            <AddToList media={mediaItemToResult(item)} mediaItemId={item.id} userId={user.id} username={profile.username} />
+          </div>
+        )}
+      </section>
+
+      {/* Stage 5: everyone's reviews, with likes. */}
+      <section className="mt-10">
+        <h2 className="text-xl font-semibold">
+          Reviews <span className="text-base font-normal text-zinc-500">{reviews.length}</span>
+        </h2>
+        {reviews.length === 0 ? (
+          <p className="mt-3 text-zinc-400">No reviews yet. Write one when you log it.</p>
+        ) : (
+          <div className="mt-2 divide-y divide-zinc-800">
+            {reviews.map((review) => (
+              <SocialLogCard
+                key={review.id}
+                log={review}
+                showMedia={false}
+                onLikeChange={(change) =>
+                  setLoaded((previous) =>
+                    previous ? { ...previous, reviews: applyLikeChange(previous.reviews, review.id, change) } : previous,
+                  )
+                }
+              />
+            ))}
+          </div>
         )}
       </section>
     </div>

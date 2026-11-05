@@ -9,7 +9,15 @@ import { createMockMediaStore } from "./mock";
 import { createSupabaseMediaStore } from "./supabase";
 import type { MediaStore } from "./types";
 
-export type { LogStatus, LogWithMedia, MediaResult, MediaStore, NewLogInput } from "./types";
+export type {
+  ListWithItems,
+  LogStatus,
+  LogWithMedia,
+  MediaResult,
+  MediaStore,
+  NewLogInput,
+  SocialLog,
+} from "./types";
 
 let store: MediaStore | null = null;
 
@@ -24,6 +32,8 @@ export function getMediaStore(): MediaStore {
       storage,
       // The demo auth knows who is signed in; the demo store just asks it.
       getCurrentUserId: async () => (await getAuthService().getCurrentUser())?.id ?? null,
+      // Stage 5: names on the feed, reviews and lists come from the demo profiles.
+      getProfile: (userId) => getAuthService().getProfileForUser(userId),
     });
   }
   return store;

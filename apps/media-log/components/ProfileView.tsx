@@ -1,16 +1,48 @@
 "use client";
 
 import Link from "next/link";
+import { useCallback, useEffect, useState } from "react";
+import { getMediaStore } from "@/lib/media";
 import { countByType, groupByType, latestLogPerItem, TYPE_LABELS } from "@/lib/media/display";
 import { MEDIA_TYPES } from "@/lib/media/types";
 import { useAuth } from "./AuthProvider";
+import { Avatar } from "./Avatar";
+import { FollowButton } from "./FollowButton";
 import { PosterGrid } from "./PosterGrid";
 import { useProfileLogs } from "./useProfileLogs";
 
+// Who follows this profile and whom it follows (Stage 5), for the counters and the button.
+type Follows = { profileId: string; followers: string[]; following: string[] };
+
+/** Loads the follow lists of a profile. `reload` is called after you follow/unfollow. */
+function useFollows(profileId: string | null) {
+  const [follows, setFollows] = useState<Follows | null>(null);
+
+  const reload = useCallback(() => {
+    if (!profileId) return;
+    let cancelled = false;
+    const store = getMediaStore();
+    Promise.all([store.getFollowers(profileId), store.getFollowing(profileId)])
+      .then(([followers, following]) => {
+        if (!cancelled) setFollows({ profileId, followers, following });
+      })
+      // Counters are a bonus: if they fail to load (e.g. offline), the profile still shows.
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [profileId]);
+
+  useEffect(() => reload(), [reload]);
+  // Same "stale answer" rule as useProfileLogs: an answer for another profile counts as loading.
+  return { follows: follows && follows.profileId === profileId ? follows : null, reload };
+}
+
 export function ProfileView({ username }: { username: string }) {
-  const { user } = useAuth();
+  const { user, profile: myProfile } = useAuth();
   // Loading the profile and its logs is shared with the diary page (see useProfileLogs.ts).
   const { wanted, lookup } = useProfileLogs(username);
+  const { follows, reload: reloadFollows } = useFollows(lookup?.profile?.id ?? null);
 
   // Still loading (or loading a different username after navigation).
   if (!lookup) {
@@ -45,23 +77,40 @@ export function ProfileView({ username }: { username: string }) {
       {/* Header: stacks on phones, side by side from the "sm" breakpoint (640px) up. */}
       <section className="flex flex-col items-center gap-5 text-center sm:flex-row sm:text-left">
         {/* Placeholder avatar: the first letter of the name. Real avatars come later. */}
-        <div
-          aria-hidden="true"
-          className="flex h-24 w-24 shrink-0 items-center justify-center rounded-full bg-linear-to-br from-violet-500 to-fuchsia-600 text-4xl font-bold uppercase"
-        >
-          {name.charAt(0)}
-        </div>
+        <Avatar name={name} size="lg" />
         <div>
           <h1 className="text-3xl font-bold">{name}</h1>
           <p className="text-zinc-400">@{profile.username}</p>
           <p className="mt-2 max-w-prose text-zinc-300">
             {profile.bio || (isMe ? "No bio yet. You'll be able to add one later." : "No bio yet.")}
           </p>
-          {isMe && (
-            <span className="mt-3 inline-block rounded-full bg-violet-500/15 px-3 py-1 text-xs text-violet-300">
-              This is you
-            </span>
-          )}
+          {/* Stage 5: followers, following, and the follow button. */}
+          <div className="mt-3 flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-sm text-zinc-400 sm:justify-start">
+            {follows && (
+              <>
+                <span>
+                  <strong className="text-zinc-100">{follows.followers.length}</strong>{" "}
+                  {follows.followers.length === 1 ? "follower" : "followers"}
+                </span>
+                <span>
+                  <strong className="text-zinc-100">{follows.following.length}</strong> following
+                </span>
+              </>
+            )}
+            {isMe && (
+              <span className="inline-block rounded-full bg-violet-500/15 px-3 py-1 text-xs text-violet-300">
+                This is you
+              </span>
+            )}
+            {/* You can follow others once you have a profile yourself (the database needs it). */}
+            {!isMe && user && myProfile && follows && (
+              <FollowButton
+                userId={profile.id}
+                following={follows.followers.includes(user.id)}
+                onChange={reloadFollows}
+              />
+            )}
+          </div>
         </div>
       </section>
 
@@ -86,6 +135,9 @@ export function ProfileView({ username }: { username: string }) {
           <p className="mt-8 flex justify-end gap-4 text-sm">
             <Link href={`/u/${profile.username}/diary`} className="text-violet-400 hover:underline">
               Diary
+            </Link>
+            <Link href={`/u/${profile.username}/lists`} className="text-violet-400 hover:underline">
+              Lists
             </Link>
             {isMe && (
               <Link href="/search" className="text-violet-400 hover:underline">
@@ -116,6 +168,11 @@ export function ProfileView({ username }: { username: string }) {
           ) : (
             <p className="mt-2 text-zinc-400">@{profile.username} hasn&apos;t logged anything yet.</p>
           )}
+          <p className="mt-4 text-sm">
+            <Link href={`/u/${profile.username}/lists`} className="text-violet-400 hover:underline">
+              {isMe ? "My lists" : "Lists"}
+            </Link>
+          </p>
         </section>
       )}
     </div>
