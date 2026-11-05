@@ -4,18 +4,47 @@
 import '../styles/global.css';
 import ThemeToggle from '../components/ThemeToggle.astro';
 import RandomButton from '../components/RandomButton.astro';
+import { DEFAULT_SITE_URL, SITE_NAME, absoluteUrl, metaDescription, pageTitle } from '../lib/seo';
 
 interface Props {
   title: string;
+  description: string; // shown under the link in Google results and in share previews
+  image?: string; // path of the share image, e.g. /og/why-is-the-sky-blue.png
+  type?: 'website' | 'article';
 }
-const { title } = Astro.props;
+const { title, description, image = '/og/site.png', type = 'website' } = Astro.props;
+
+// Astro.site comes from SITE_URL (see astro.config.mjs). Search engines and social sites
+// need full addresses (https://...), not just /questions/..., so we join them here.
+const siteUrl = Astro.site?.href ?? DEFAULT_SITE_URL;
+const canonicalUrl = absoluteUrl(siteUrl, Astro.url.pathname);
+const imageUrl = absoluteUrl(siteUrl, image);
+const fullTitle = pageTitle(title);
+const cleanDescription = metaDescription(description);
 ---
 <!doctype html>
 <html lang="en">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>{title} | Have You Ever Wondered</title>
+    <title>{fullTitle}</title>
+    <meta name="description" content={cleanDescription} />
+    <!-- canonical = "this is the one true address of this page", so search engines don't
+         count /questions/a and /questions/a/ as two different pages. -->
+    <link rel="canonical" href={canonicalUrl} />
+    <link rel="sitemap" href="/sitemap.xml" />
+    <!-- Open Graph tags: what Facebook, Discord, iMessage, LinkedIn... show when someone shares a link. -->
+    <meta property="og:site_name" content={SITE_NAME} />
+    <meta property="og:type" content={type} />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={cleanDescription} />
+    <meta property="og:url" content={canonicalUrl} />
+    <meta property="og:image" content={imageUrl} />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content={title} />
+    <!-- X (Twitter) reads its own tag to show the big image version of the preview. -->
+    <meta name="twitter:card" content="summary_large_image" />
     <!-- is:inline = run as-is, right here, before the page is drawn.
          Without this, dark mode users would see a white flash on every page load. -->
     <script is:inline>

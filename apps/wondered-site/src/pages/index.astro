@@ -7,7 +7,7 @@ import { CATEGORIES, categoryLabel, sortNewestFirst } from '../lib/categories';
 // Runs once at build time, not in the visitor's browser.
 const questions = sortNewestFirst(await getCollection('questions'));
 ---
-<Base title="Home">
+<Base title="Have You Ever Wondered" description={'Short, well-explained, sourced answers to everyday "have you ever wondered...?" questions about physics, chemistry, biology, math and tech.'}>
   <h1 class="mb-3 text-4xl font-extrabold tracking-tight text-balance sm:text-6xl">Have you ever wondered...?</h1>
   <p class="mb-8 text-lg text-slate-600 dark:text-slate-400">Short, well-explained answers, STEM first.</p>
 

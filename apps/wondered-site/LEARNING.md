@@ -309,3 +309,105 @@ Add a second demo called `density` to `DEMOS` in `src/lib/demos.ts`: a slider fo
 Answers
 1. The iframe downloads a lot of YouTube code (and contacts YouTube) even if nobody watches; the button is almost free, and the iframe is created only on click.
 2. `formspreeAction` returns `null`, so the page shows the friendly "not open yet" message instead of the form. Astro only exposes variables starting with `PUBLIC_` to page code, so other names would come through as undefined.
+
+## Stage 4: Ship it (2026-11-04)
+
+### What we built
+Every page now tells search engines and social sites what it is: a proper title, a short description, a
+"canonical" address, and preview tags with a picture. Each question gets its own share image (1200 x 630 PNG),
+drawn by our code during the build. There is a `/sitemap.xml` listing every page and a `/robots.txt` pointing to it.
+A GitHub Actions workflow runs the tests, the type-check and the build on every push and pull request.
+`QUESTION_TEMPLATE.mdx` and the README section "How to add a new question in 5 minutes" make new questions quick,
+and the README has the Vercel deploy steps. Nothing is deployed yet: that's your step.
+
+### New concepts
+
+**SEO (search engine optimization).** Helping search engines understand and show your pages. The `<title>` is the
+blue link text in Google, and `<meta name="description">` is usually the grey text under it. Good, unique titles
+and descriptions per page matter more than any trick.
+
+**Canonical URL.** One page can often be reached by several addresses (with or without the final `/`, with `?ref=...`).
+`<link rel="canonical">` says "this is the official address", so search engines don't split the page's ranking between copies.
+It must be a full address (`https://...`), which is why the site needs to know its own URL.
+
+**Open Graph tags.** `<meta property="og:...">` tags are read by Facebook, Discord, iMessage, LinkedIn, Slack and others
+to draw the preview card when someone pastes your link. `og:image` is the picture; `twitter:card` asks X for the big version.
+
+**Sitemap and robots.txt.** A sitemap is an XML list of every page (with dates), so search engines find pages even
+if nothing links to them yet. `robots.txt` is a small text file robots read first; ours says "visit everything" and
+where the sitemap is.
+
+**Endpoints (non-HTML pages).** In `src/pages/`, a `.ts` file that exports `GET` produces a file instead of a page.
+`sitemap.xml.ts` becomes `/sitemap.xml`. `og/[slug].png.ts` combines this with `getStaticPaths()`, so it makes one
+PNG per question, just like `[slug].astro` makes one HTML page per question.
+
+**SVG to PNG at build time.** SVG is a picture written as text (`<rect>`, `<text>`...), so we can build it as a string
+and test it. Social sites want PNG, so `sharp` (an image library) converts it. SVG doesn't wrap text, so `wrapText`
+splits the title into lines, and `titleLayout` picks smaller letters when the title is long.
+
+**Environment variable for the site address.** `astro.config.mjs` reads `SITE_URL` with Vite's `loadEnv`
+(the config runs before Astro reads `.env.local` itself). Astro then gives it to pages as `Astro.site`.
+No `PUBLIC_` prefix is needed because it's only used at build time, never in the browser.
+
+**GitHub Actions and `paths:`.** A workflow is a recipe GitHub runs on its own computers. `on: push` + `paths:` means
+"only when files in these folders change", so editing another app doesn't rebuild this one. `npm ci` installs the exact
+versions in `package-lock.json`, so the check uses the same versions as your computer.
+
+### New dependency
+- **sharp** turns the SVG drawing into a PNG. Astro already downloaded it (it uses it for images), but only as an
+  optional extra; listing it in `package.json` guarantees it's installed on GitHub and Vercel.
+
+### Files and what each one does
+- `src/lib/seo.ts` + `seo.test.ts` site URL with a placeholder default, full URLs, 160 character descriptions, titles, sitemap XML.
+- `src/lib/og.ts` + `og.test.ts` title wrapping, layout choice, and the SVG design of the share image.
+- `src/pages/og/[slug].png.ts` one share image per question. `src/pages/og/site.png.ts` the image for other pages.
+- `src/pages/sitemap.xml.ts`, `src/pages/robots.txt.ts` the sitemap and robots file.
+- `src/layouts/Base.astro` now needs a `description`, and writes the title, description, canonical and Open Graph tags.
+- `src/pages/*.astro` each page passes its description (questions also pass their image and `type="article"`).
+- `astro.config.mjs` sets `site` from `SITE_URL`.
+- `.env.example` documents `SITE_URL`. `package.json` / `package-lock.json` add `sharp`.
+- `QUESTION_TEMPLATE.mdx` the file to copy. `README.md` the 5 minute guide, SEO notes and deploy steps.
+- `../../.github/workflows/wondered-site.yml` the GitHub Actions check.
+
+### Most important lines
+```ts
+const canonicalUrl = absoluteUrl(siteUrl, Astro.url.pathname);
+```
+`Astro.url.pathname` is this page's path (`/questions/why-is-the-sky-blue/`). Joining it to the site address gives the
+full official URL, used for both `canonical` and `og:url`.
+
+```ts
+const png = await sharp(new TextEncoder().encode(svg)).png().toBuffer();
+```
+`TextEncoder` turns the SVG text into bytes, `sharp` reads those bytes as an image, and `.png()` saves it as PNG.
+It runs once per question during `npm run build`, so visitors just download a ready-made file.
+
+```ts
+const lines = wrapText(title, layout.charsPerLine, layout.maxLines + 1);
+if (lines.length <= layout.maxLines) return { fontSize: layout.fontSize, lines };
+```
+Asking for one extra line is a trick: if we get it, the title didn't fit, so we try the next (smaller) layout.
+
+### Decisions
+- Placeholder site URL: `https://wondered-site.vercel.app`, used when `SITE_URL` is empty. Change it once you know the real address.
+- Own sitemap endpoint instead of the `@astrojs/sitemap` package: about 20 lines, no new dependency, and it's tested.
+- Pages that aren't questions share one image (`/og/site.png`) with the same design.
+- The search page is listed in the sitemap like the others (simplest option).
+- Fonts: the image uses DejaVu Sans, which GitHub's Ubuntu machines have. If Vercel's build machine lacks it, sharp
+  uses another sans-serif font, so letters may look a little different. Check `/og/why-is-the-sky-blue.png` after the first deploy.
+- `SITE_URL` without a `PUBLIC_` prefix, because only the build needs it.
+
+### Practice exercise
+Change the share image design in `src/lib/og.ts`: give each category its own pill colour (for example a small
+`Record<string, string>` from label to colour). Run `npm run build`, then open `dist/og/why-does-ice-float.png` to see it.
+Add a test checking that the SVG for "Biology" contains your biology colour.
+
+### Quiz
+1. Why does the site need `SITE_URL` at all, when links like `/search/` work fine without it?
+2. The workflow uses `paths:`. What would happen without it when you push a change to another app?
+
+Answers
+1. Canonical links, `og:image`/`og:url` and the sitemap must be full addresses (`https://...`), because they're read by
+   Google and social sites from outside the page, where `/search/` alone means nothing.
+2. The wondered-site checks would run on every push to the repo, even when nothing in the site changed: slower, and a
+   red X could appear on a commit that never touched the site.

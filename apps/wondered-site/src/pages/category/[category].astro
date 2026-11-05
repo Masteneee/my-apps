@@ -12,7 +12,7 @@ export function getStaticPaths() {
 const category = Astro.params.category as Category;
 const questions = sortNewestFirst(inCategory(await getCollection('questions'), category));
 ---
-<Base title={categoryLabel(category)}>
+<Base title={`${categoryLabel(category)} questions`} description={`Short, sourced answers to everyday ${categoryLabel(category).toLowerCase()} questions.`}>
   <h1 class="mb-8 text-4xl font-extrabold tracking-tight sm:text-5xl">{categoryLabel(category)}</h1>
   {questions.length > 0
     ? <QuestionList questions={questions} />

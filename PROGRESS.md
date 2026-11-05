@@ -14,7 +14,7 @@ Not started.
 - [x] Stage 1: Skeleton + content system
 - [x] Stage 2: Discovery
 - [x] Stage 3: Video + interactivity
-- [ ] Stage 4: Ship it
+- [x] Stage 4: Ship it
 
 ## 3. media-log (flagship)
 - [ ] Stage 1: Skeleton + accounts

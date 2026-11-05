@@ -22,8 +22,10 @@ const { question, related } = Astro.props;
 const { title, category, short_answer, youtube_id, sources, date } = question.data;
 // render() turns the MDX body into a component we can place on the page.
 const { Content } = await render(question);
+// The short answer doubles as the page description, and each question gets its own
+// share image, made by src/pages/og/[slug].png.ts.
 ---
-<Base title={title}>
+<Base title={title} description={short_answer} image={`/og/${question.id}.png`} type="article">
   <article>
     <a href={`/category/${category}/`} class="text-sm font-semibold uppercase tracking-widest text-indigo-600 hover:underline dark:text-indigo-300">
       {categoryLabel(category)}

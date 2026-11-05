@@ -1,0 +1,37 @@
+# Checks the wondered-site on GitHub's computers on every push and pull request,
+# but only when something inside apps/wondered-site (or this file) changed.
+# If tests, the type-check or the build fail, GitHub shows a red X on the commit.
+name: wondered-site
+
+on:
+  push:
+    paths:
+      - 'apps/wondered-site/**'
+      - '.github/workflows/wondered-site.yml'
+  pull_request:
+    paths:
+      - 'apps/wondered-site/**'
+      - '.github/workflows/wondered-site.yml'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        # Every "run:" step below starts inside the app folder.
+        working-directory: apps/wondered-site
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/wondered-site/package-lock.json
+      # npm ci installs exactly what package-lock.json says (faster and stricter than npm install).
+      - run: npm ci
+      - run: npm test
+      # astro check finds TypeScript mistakes in .astro and .ts files.
+      - run: npm run check
+      # The build also validates every question file and draws the share images,
+      # so a broken .mdx file fails here instead of on the live site.
+      - run: npm run build
