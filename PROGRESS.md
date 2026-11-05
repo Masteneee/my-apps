@@ -3,7 +3,9 @@
 Legend: `[ ]` to do, `[x]` done, `[?]` needs my choice, `[!]` failed (reason noted)
 
 ## Status
-Done: shorts-blocker (3/3), wondered-site (4/4), media-log (7/7, not deployed), wellbeing-app Stages 1 to 3. Everything runs in demo mode with sample data until keys exist. Next: wellbeing-app Stage 4. Best thing for me to do: create the Supabase project and TMDB key (see SETUP-NEEDED.md) so media-log can be tested for real.
+Done: shorts-blocker (3/3), wondered-site (4/4), media-log (7/7), wellbeing-app (5/5), budget-app phases 0 to 3. Nothing is deployed, and media-log and wellbeing-app run in demo mode with sample data until Supabase/TMDB/IGDB keys exist.
+Waiting on me: budget-app 4.0, pick a stock-price data source (options A to E in apps/budget-app/LEARNING.md; recommended: Finnhub with each person's own key). workout-app and study-tools are for later.
+Best next thing for me to do: create one Supabase project and run the media-log migrations (SETUP-NEEDED.md), so the flagship app can be tested for real before deploying.
 
 ## 1. shorts-blocker (Chrome extension)
 - [x] Stage 1: Skeleton + YouTube
@@ -38,7 +40,7 @@ Group small tasks: one subagent per phase is fine for phases 0 to 2.
 - [x] Phase 1: Log money (1.1 to 1.6)
 - [x] Phase 2: See it (2.1 to 2.4)
 - [x] Phase 3: Goals without guilt (3.1 to 3.5)
-- [ ] Phase 4: Learn investing (starts with 4.0, which needs my choice)
+- [?] Phase 4: Learn investing, needs Amasten's choice (4.0 research done, see budget-app LEARNING.md)
 
 ## 6. workout-app (plain HTML/JS, see its CLAUDE.md)
 Group small tasks: one subagent per phase is fine for phases 0 to 3.

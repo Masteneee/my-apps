@@ -42,6 +42,7 @@ Choices made when the task left something open (the simplest option each time):
 - **Settings in backups (3.4):** settings always have a value (the defaults), so "what's here wins" means the file's settings are used only if the settings here were never changed from the defaults. Files without settings (version 1, or made before 3.4) change nothing.
 - **Rollover (3.5): off by default, one switch for all budgets.** When on, what you didn't spend of a budget last month is added to the same budget this month (Fun $50, spent $30 in October: November's Fun is $70, with "Includes $20 not spent in October"). Only last month counts: it doesn't pile up over many months, so you can check every number by hand. Spending more than planned never makes next month smaller (no negative rollover). If last month has no entries at all, nothing rolls over: you probably weren't using the app yet, and a "free" doubled budget would be misleading.
 - **Rollover doesn't change "safe to spend" (3.5).** Safe to spend counts only this month's money, and the rolled-over part of the Bills budget is last month's money, so "bills still to pay" keeps using the plain Bills budget. Otherwise turning rollover on would lower safe to spend, which would feel backwards.
+- **Stock-price data source (4.0): PENDING AMASTEN'S CHOICE.** Recommended: **Finnhub's free plan, with each person typing their own free key into the Practice tab** (saved in localStorage, never in the code and never in backups). Second choice: Twelve Data the same way. Details and the other options are in the "Task 4.0" section below. Nothing gets built until Amasten picks.
 
 ---
 
@@ -1134,3 +1135,91 @@ Make rollover pile up: November's Fun budget would include what was unspent in O
 1. $50. October's unspent part is `Math.max(0, 5000 - 8000) = 0`, so nothing is added and nothing is taken away.
 2. Because it depends on October's entries, which can still change (you can edit or delete them, or import a backup). A saved $70 could become wrong; a calculation is always right.
 </details>
+
+---
+
+## Task 4.0: Choose a data source (2026-11-05)
+
+Research only: no app code was changed. **STOP: Amasten chooses before 4.1.**
+
+### Plan
+- List the free stock-price APIs that could work for a plain-file app with no server.
+- Compare 3 (Finnhub, Twelve Data, Alpha Vantage) on free limits, key, browser use (CORS) and key risk. Add Financial Modeling Prep and "no-key" sources as side notes.
+- Explain CORS and "a key in public code" in plain words.
+- Recommend one, list the fallbacks, and stop.
+
+### How fresh is this research? (read this first)
+On 2026-11-05 web *search* worked, but the providers' own websites (finnhub.io, twelvedata.com, alphavantage.co) were blocked from the session that did this research, so their pricing pages couldn't be opened directly. The numbers below come from search results (Twelve Data's own help centre, FMP's own pricing page, third-party guides for the others) plus Claude's own knowledge (up to mid-2026). Free limits change often. **Re-check each provider's pricing page before 4.1**, and the first thing 4.1 should do is one test call from the real page.
+
+### Comparison
+
+| | **Finnhub** (recommended) | **Twelve Data** | **Alpha Vantage** |
+|---|---|---|---|
+| Free limit | about **60 calls per minute** (one guide also mentions a daily cap of about 300; not confirmed) | **8 credits per minute, 800 per day** (from their own help centre; a simple quote costs 1 credit) | **25 calls per day**, about 5 per minute |
+| Needs a key? | Yes, free, sign up with an email | Yes, free, sign up with an email | Yes, free (the `demo` key only works for a few sample tickers like IBM) |
+| Callable from a browser (CORS)? | Yes, as far as we know (to be tested in 4.1) | Yes, as far as we know (to be tested in 4.1) | Yes, as far as we know (to be tested in 4.1) |
+| Price you get on free | Latest price for US stocks and ETFs (e.g. AAPL, SPY). Other countries are mostly paid | Latest price for US stocks and ETFs, possibly delayed. Some other markets | Mostly delayed / end-of-day on free |
+| Search by name or ticker | Yes (`/search`) | Yes (`/symbol_search`) | Yes, but each search uses 1 of your 25 daily calls |
+| Key-in-public-code risk | Low money risk (free key, read-only, no card). Real risk: someone copies it and uses up the limit, or the key gets disabled | Same as Finnhub, but 800 per day runs out faster if the key is shared | Same, and 25 per day could be used up by one curious visitor |
+| Fits 4.1 and 4.2? | Yes: a search plus prices for 5 to 10 holdings is easy | Yes, if we save prices for a few minutes so we don't ask again on every redraw | Too tight: one evening of testing could use the whole day |
+
+Side notes:
+- **Financial Modeling Prep (FMP):** free plan is about 250 calls per day, mostly end-of-day data and US exchanges only (sources disagree on whether all US tickers or only sample ones are included). Workable, but nothing it does beats Finnhub for us.
+- **"No key" sources (Yahoo Finance, Google Finance, Stooq):** they're not real public APIs. They block browser calls (no CORS), change without warning, and Stooq started asking for a key/captcha in 2026. Not realistic for a plain-file app.
+
+### New concepts
+
+**What is an API?** A web address that answers with data instead of a page. Our app would ask `https://finnhub.io/api/v1/quote?symbol=SPY&token=OUR_KEY` and get back a small piece of JSON like `{"c": 512.34, ...}` (`c` = current price). It's like `fetch` reading a file, except the file lives on someone else's computer.
+
+**What is an API key?** A long secret word the provider gives you when you sign up, sent with every request. It tells them *who* is asking, so they can count your calls and stop you at the free limit. Whoever has the key can make calls that count against *your* limit.
+
+**What is CORS?** (Cross-Origin Resource Sharing.) Your page comes from one place (your GitHub Pages address, or `file://` when you open `index.html` directly). When its JavaScript asks a *different* site for data, the browser acts like a security guard: it only lets your code read the answer if that other site says "this is allowed" with a header like `Access-Control-Allow-Origin: *`. **The other site decides, not your code**, so if an API doesn't send that header, no amount of JavaScript can fix it from the browser; you'd need a server in the middle. That's why Yahoo or Google prices don't work for us, and why the APIs above (which do send the header) do. Bonus detail: a page opened as a plain file has the origin `null`, and `*` still allows it, so it should work both on GitHub Pages and from your computer.
+
+**Why is a key in public code risky?** The repo is public and the site is just files, so anything written in `app.js` can be read by anyone: on GitHub, with "View source", or in the browser's Network tab. Bots scan GitHub for keys within minutes of a push. With a *free, read-only* key the worst case is not stolen money but: (1) someone else uses up your limit, (2) every visitor shares the same limit (10 friends using the app at once share 60 calls a minute), (3) the provider disables the key for abuse and the app stops showing prices. The rule to remember: **never put a key tied to a credit card, or one that can change things (send, buy, delete), in public code.** And CORS doesn't protect your key: it controls who can *read answers in a browser*, not who can *use the key*.
+
+**What is a proxy?** A tiny program on a server that sits in the middle: the page asks the proxy, the proxy adds the secret key and asks the API, then passes the answer back. The key never reaches the browser. Free options exist (for example a Cloudflare Worker), but it means a second thing to deploy and an account to manage, and our CLAUDE.md says the app has no server.
+
+### Recommendation (pending Amasten's choice)
+
+**Finnhub, free plan, "bring your own key".** In 4.1 the Practice tab would have a "Your Finnhub key" box. You paste your free key once; `storage.js` saves it in localStorage on your own device. It's never written in the code, never pushed to GitHub, and left out of the export file (so sharing a backup doesn't share the key).
+
+Why:
+- 60 calls a minute is by far the most room on a free plan, so search + buy/sell + holdings won't hit the limit.
+- It works from a plain browser page, so we keep "no server, no build step".
+- Nothing secret ever goes in the public repo, so the "key in public code" problem simply doesn't exist.
+- It's a good lesson in itself (API, key, JSON, limits), and if Finnhub changes its free plan we can switch to Twelve Data by changing one function.
+
+The cost: anyone else who opens the site must get their own free key to see live prices. Without a key, the Practice tab could show a calm "Add a free key to see live prices" message (and could still teach with sample prices clearly labelled as samples, if you want that).
+
+To be gentle with limits either way, 4.1 should remember a price for a few minutes (for example 5) instead of asking again on every redraw, and always say "price may be delayed".
+
+### Other options, if you prefer
+- **A. Recommended above:** Finnhub, key typed in the app and kept in localStorage.
+- **B. Free key written in the code.** The simplest to build and nobody has to sign up. Accept that the key is public: it can be used up or disabled, and then you make a new one. Only ever with a free, no-credit-card key.
+- **C. Tiny serverless proxy** (e.g. a free Cloudflare Worker) that holds the key. Hides the key properly and everyone shares your limit, but needs a Cloudflare account, a second deploy, and breaks "no server" a little.
+- **D. End-of-day prices file.** A scheduled GitHub Action fetches closing prices for a fixed list of tickers once a day (key kept in GitHub Secrets) and commits a `prices.js` file the page loads with a `<script>` tag (which also works from `file://`). No key in the browser at all and works offline, but prices are a day old, only tickers on the list, and it adds a workflow file to learn.
+- **E. No API: sample prices only.** Zero setup, but not real prices, and less fun.
+
+### Files changed
+- `LEARNING.md`: this section, and a "pending" line under "Decisions". No app files changed. PLAN.md is **not** ticked: 4.0 is done when Amasten has chosen.
+
+### Try it yourself
+After making a free Finnhub account, paste this into your browser's address bar (with your key at the end): `https://finnhub.io/api/v1/quote?symbol=SPY&token=YOUR_KEY`. You'll see raw JSON. Which field is the current price, and which is yesterday's close? (Hint: look at `c` and `pc`.) Then open your browser's DevTools, Network tab, and notice that the full address, key included, is visible: that's exactly what anyone could see if the key were in our code.
+
+### Quiz
+1. Your page on GitHub Pages fetches prices from an API and the browser says "blocked by CORS policy". Can you fix it by changing `app.js`? Why or why not?
+2. Why is a free, read-only key in public code a smaller problem than an API key linked to your credit card, and what can still go wrong?
+
+<details><summary>Answers</summary>
+
+1. No. CORS is decided by the *other* site: it must send `Access-Control-Allow-Origin` in its answer. From the browser you can only switch to an API that sends it, or put a server (proxy) in the middle.
+2. A free read-only key can't spend money or change anything, so the worst case is someone using up the free limit or the key being disabled (prices stop until you make a new key). A key linked to a card could run up a bill.
+</details>
+
+### Sources (searched 2026-11-05; official pages couldn't be opened, so re-check)
+- Twelve Data help centre, credits and limits: https://support.twelvedata.com/en/articles/5194820-api-credits-limits and https://support.twelvedata.com/en/articles/5615854-credits
+- FMP pricing: https://site.financialmodelingprep.com/developer/docs/pricing
+- Alpha Vantage limits (third party): https://www.macroption.com/alpha-vantage-api-limits/ ; official: https://www.alphavantage.co/premium/
+- Finnhub 60 calls/min (third party): https://metacpan.org/pod/Finance::Quote::Finnhub and https://github.com/Finnhub-Stock-API/finnhub-js/issues/2 ; official: https://finnhub.io/pricing
+- Free API comparison (third party, mentions the possible Finnhub daily cap): https://qveris.ai/guides/stock-api-free-comparison/
+- Hiding keys in frontend code: https://corsfix.com/hide-api-key
