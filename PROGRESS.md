@@ -29,7 +29,7 @@ Done: shorts-blocker (3/3), wondered-site (4/4), media-log (7/7, not deployed), 
 - [x] Stage 1: Skeleton + accounts + PWA
 - [x] Stage 2: Daily check-in
 - [x] Stage 3: Streaks + calendar
-- [ ] Stage 4: Friends + shared streaks
+- [x] Stage 4: Friends + shared streaks
 - [ ] Stage 5: Insights + ship
 
 ## 5. budget-app (plain HTML/JS, see its CLAUDE.md)

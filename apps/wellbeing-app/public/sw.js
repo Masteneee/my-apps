@@ -35,6 +35,7 @@ const STATIC_CACHE = `${CACHE_PREFIX}static-${CACHE_VERSION}`;
 // so they open offline even if you never visited them.
 // Stage 2: "/checkin" (the daily check-in) and "/habits" (add/archive habits).
 // Stage 3: "/streaks" (streaks + calendars) and "/breathe" (breathing exercise).
+// Stage 4: "/friends" (friends + shared streaks).
 // They are page SHELLS, the same for everyone: your answers are never in here.
 const APP_SHELL = [
   "/",
@@ -42,6 +43,7 @@ const APP_SHELL = [
   "/habits",
   "/streaks",
   "/breathe",
+  "/friends",
   "/login",
   "/signup",
   "/onboarding",

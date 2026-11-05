@@ -6,7 +6,7 @@ export function DemoBanner() {
   if (authMode !== "mock") return null;
   return (
     <div className="bg-accent-soft px-4 py-2 text-center text-xs text-muted">
-      Demo mode: no Supabase keys yet, so your account and check-ins are saved only in this browser.
+      Demo mode: no Supabase keys yet, so your account, check-ins and friends are saved only in this browser.
     </div>
   );
 }

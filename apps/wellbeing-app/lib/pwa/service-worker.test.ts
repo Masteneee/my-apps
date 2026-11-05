@@ -140,6 +140,10 @@ describe("app shell", () => {
     expect(sw.APP_SHELL).toContain("/breathe");
   });
 
+  it("saves the friends page in advance too (Stage 4)", () => {
+    expect(sw.APP_SHELL).toContain("/friends");
+  });
+
   it("only lists pages that really exist (a typo would make the whole install fail)", () => {
     const pages = sw.APP_SHELL.filter((path) => !path.startsWith("/icons/") && !path.includes("."));
     for (const path of pages) {

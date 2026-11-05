@@ -404,3 +404,145 @@ duplicate date counts once; a date after today doesn't count. Run `npm test`, wa
 write the function (hint: `addDays(today, -(days - 1))` is the first day, and you can compare keys as
 text). Then show it in `StreaksView.tsx` using `habitDoneDates(habit, data.entries)`.
 Bonus question: should a frozen day count as "done" here? Why or why not?
+
+## Stage 4: Friends + shared streaks (2026-11-05)
+
+### What we built
+A `/friends` page: add a friend by username, accept or decline requests, remove a friend. Then
+**shared streaks**: pick a friend and one of your habits, they accept by picking one of *their*
+habits, and the streak only grows on days you **both** did it. When your friend did it today and you
+haven't, a gentle nudge says "Sam checked in for Stretch. Your turn!" on `/friends` and on the home
+page's new Friends card (in the app only, no notifications). Data goes through a new `FriendsStore`
+interface with two versions, like auth and check-ins. In demo mode, **Sam** is a pretend friend so you
+can try it all in one browser.
+
+### The shared streak rules (decided this stage)
+1. A shared streak counts the days in a row you **both** completed the habit. Each of you uses your
+   own local day (your phone's time zone).
+2. A day only one of you did is a **missed day for the pair**.
+3. **Freezes** work exactly like personal ones, on the pair's days: one missed day between two
+   both-done days is frozen, one freeze per 7 days, two missed days in a row end it. The pair shares
+   that freeze, and it's separate from your personal streak's freeze.
+4. "Done" means the same as before: a habit with a goal counts when its owner reaches *their* goal.
+5. **Nothing is stored**: the count, best and freezes are worked out from both people's days each
+   time (see "Deriving the counts" below).
+
+### New concepts
+
+**Reusing a tested function instead of writing a new one (sets and intersection).** The hard part of
+streaks (missed days, freezes, today, daylight saving) is already solved and tested in
+`computeStreak`. A shared streak is just "a streak of the days you both did it". So
+`lib/friends/shared-streaks.ts` only computes the *intersection* of your days and your friend's (the
+days in both lists, using a `Set` like Stage 3) and passes it to `computeStreak`. That's a few lines
+instead of a second copy of the rules that could drift apart from the first.
+
+**Deriving the counts instead of storing them.** PLAN.md listed `current_count`, `best_count` and
+`last_both_date` columns. We left them out. They would be a *cache*: a saved copy of something we can
+compute. A copy can go stale: an old day synced late from offline, an unticked habit, a freeze that
+moves. Worse, a count would need *both* people to update the same row, so either could write any
+number. Computing it from the facts (who did what on which day) is always right. Same rule as Stage
+3's freezes: store the facts, compute the rest.
+
+**A friendship is a pair with a direction.** `friendships` has `user_a` (who asked), `user_b` (who
+was asked) and `status` (pending/accepted). Declining or unfriending *deletes* the row, so you can
+ask again later. To allow only one row per pair whatever the direction, the unique index is on
+`(least(user_a, user_b), greatest(user_a, user_b))`: both orders give the same two values. In the
+app, each row is turned into a "view" from *your* side (`toFriendshipView`): who the friend is and
+whether the request is incoming or outgoing.
+
+**Security definer functions (the friend's only window into your habits).** RLS works on whole rows,
+and a `habit_entries` row contains the value (e.g. "25 minutes"), which a friend doesn't need. So
+there is no friends rule on any of your tables. Instead, `shared_streak_days(streak, from, to)` is a
+database function marked `security definer`: it runs with the rights of its owner (like a program
+running as administrator), so it can read past RLS. It's safe because the function itself decides
+what comes out: it only answers the two people in an active shared streak who are still friends, only
+looks at those two habits, works out "done" inside (so neither the value nor the goal leaves the
+database) and returns only `(user_id, day)`. `set search_path = ''` is the standard safety rule for
+such functions: it uses only tables written in full (`public.habits`), so nobody can slip in a
+look-alike table.
+
+**Column-level permissions.** Accepting a request is an UPDATE. A normal policy would allow changing
+*any* column of the row, including who it's between. `grant update (status) on friendships` allows
+only the `status` column to be changed (`status, habit_b` on `shared_streaks`). Supabase gives new
+tables broad permissions by default, so the migration first does `revoke all ... from anon,
+authenticated`, then grants back only what the app uses.
+
+**Letting the database check ownership (composite foreign keys, again).** A shared streak stores
+`habit_a` and `habit_b`. `foreign key (habit_a, user_a) references habits (id, user_id)` means habit_a
+must be a habit *of user_a* (same trick as `habit_entries` in Stage 2), so nobody can attach someone
+else's habit. And `friendship_id ... on delete cascade` means unfriending removes the shared streaks
+too, in the database, in one step. Inside the insert policy, a subquery checks the friendship is
+accepted and between exactly these two people (`shared_streaks.user_a` is written in full there,
+because a bare `user_a` inside the subquery would mean the friendship's column).
+
+**Consent: an invite, not a link.** You can't see your friend's habits (they're owner-only), and
+sharing your days is a choice. So a shared streak starts as *pending* with only your habit, and your
+friend accepts by choosing which of *their* habits counts. The habit's name is copied into the row
+(`habit_name`) so they know what you're inviting them to.
+
+**A demo friend (a "fixture").** In testing, a *fixture* is data prepared in advance so you can try
+something. Demo mode lives in one browser, so `lib/friends/demo-friend.ts` makes Sam, a real demo
+account that accepts everything and gets a made-up history (the last 14 days, minus 3 and 8 days
+ago) when you share a habit, today included, so you see the nudge at once. It's clearly labeled,
+only exists in demo mode (`getDemoFriendTools()` returns null with Supabase), and you can log in as
+Sam to see the other side. Two real demo accounts in the same browser also work.
+
+**Waiting for several requests at once (`Promise.all`).** The friends page needs the days of every
+active shared streak. `await` in a loop would ask one after the other. `Promise.all(list.map(...))`
+starts them all at once and waits until all are back, in the same order as the list.
+
+**In-app nudges vs push notifications.** Push notifications need a server that sends messages,
+permission prompts and extra setup on iPhones. A nudge computed when you open the app (`nudge =
+friend did it today && I haven't`) is a pure function, easy to test, and gentle on purpose: no
+buzzing phone, just a note when you come back.
+
+**Reused from earlier stages:** the interface + two implementations + `index.ts` (now
+`getFriendsStore()`), `computeStreak` and `isHabitDone` (Stage 3), `fetchAllPages` for long lists
+(Stage 3), `todayKey()` (Stage 2), `validateUsername` (Stage 1, usernames are how you find friends),
+the "load in an effect, ignore if cancelled" pattern and the service worker's `APP_SHELL` (now with
+`/friends`).
+
+### Dependencies
+None added. Everything is Supabase features we already use (tables, RLS, a SQL function called with
+`supabase.rpc()`) and plain TypeScript.
+
+### Offline
+The `/friends` page shell is saved in advance, so it opens offline. In demo mode everything works
+offline (localStorage). In Supabase mode, friends and shared streaks need the internet: the page says
+"You're offline. Friends and shared streaks need the internet." with a Try again button, and the home
+card stays quiet. Your check-in still works offline as before, and its changes count for shared
+streaks once they sync.
+
+### Files in this stage
+- `supabase/migrations/20261105120000_friends_shared_streaks.sql`: `friendships`, `shared_streaks`,
+  their RLS and column permissions, and the security-definer `shared_streak_days` function.
+- `lib/friends/types.ts`: shapes of the data and the `FriendsStore` interface.
+- `lib/friends/shared-streaks.ts` (+ test): the shared streak rules (intersection + `computeStreak`),
+  the nudge, the hints, and the summary for the screens.
+- `lib/friends/views.ts` (+ test): rows seen from your side, the "can I send this request?" check,
+  cleaning a typed username. Shared by both stores.
+- `lib/friends/mock.ts` (+ test): the demo store, with the same rules as the database.
+- `lib/friends/demo-friend.ts`: demo friend Sam (account, made-up history, "checks in today").
+- `lib/friends/supabase.ts` (+ test): the real store; friendly error messages.
+- `lib/friends/index.ts`: `getFriendsStore()` and `getDemoFriendTools()` (demo mode only).
+- `lib/friends/migration.test.ts`: checks the SQL never opens check-ins or habit entries to friends,
+  and that the function returns only (who, which day).
+- `app/friends/page.tsx` + `components/friends/FriendsView.tsx`: the friends page.
+- `components/friends/SharedStreaksSection.tsx`: shared streaks, invites, "Start a shared streak".
+- `components/friends/useFriendsData.ts`: loads everything and computes the shared streaks.
+- `components/friends/useAction.ts`: runs a button's action, shows its error, reloads.
+- `components/friends/FriendsCard.tsx` + `components/HomeView.tsx`: the home page's Friends card and nudge.
+- `components/DemoBanner.tsx`: mentions friends.
+- `public/sw.js` + `lib/pwa/service-worker.test.ts`: `/friends` saved in advance.
+- `README.md`, `LEARNING.md`: this.
+
+### Exercise
+Show **"Best together: N days"** for each friend on the home Friends card, the best shared streak you
+have with that friend across all your shared habits. First write a pure function
+`bestWithEachFriend(summaries)` in `lib/friends/shared-streaks.ts` that returns a `Map` from the
+friend's id to the highest `result.streak.best` among that friend's summaries. Write the tests first
+in `shared-streaks.test.ts`: no summaries → empty map; two habits with the same friend (best 3 and 7)
+→ 7; two friends → one entry each. Run `npm test`, watch them fail, write the function (a `for` loop
+and `Math.max`), then use it in `FriendsCard.tsx`. Bonus question: we chose not to store
+`best_count`. If a habit entry from 10 days ago is deleted, what happens to "best together"? Why is
+that the right behaviour?
