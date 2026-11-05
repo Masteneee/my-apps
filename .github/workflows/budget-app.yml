@@ -1,0 +1,30 @@
+# Checks budget-app on GitHub's computers on every push and pull request,
+# but only when something inside apps/budget-app (or this file) changed.
+# If a test fails, GitHub shows a red X on the commit.
+name: budget-app
+
+on:
+  push:
+    paths:
+      - 'apps/budget-app/**'
+      - '.github/workflows/budget-app.yml'
+  pull_request:
+    paths:
+      - 'apps/budget-app/**'
+      - '.github/workflows/budget-app.yml'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        # Every "run:" step below starts inside the app folder.
+        working-directory: apps/budget-app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      # No npm install: the app has no packages. tests.js only uses Node's
+      # built-in "assert", and it exits with an error code if a test fails.
+      - run: node tests.js

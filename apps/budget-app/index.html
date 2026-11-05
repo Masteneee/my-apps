@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <!-- Tells phones to use the real screen width instead of pretending to be a
+       980px-wide desktop and zooming out (see LEARNING.md, task 1.6). -->
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Pocket Budget</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="app-header">
+    <h1>Pocket Budget</h1>
+    <p class="tagline">Log money in seconds. No guilt, just a clear picture.</p>
+  </header>
+
+  <main>
+    <!-- Task 0.1 / 1.4: the month summary at the top. -->
+    <section id="this-month" class="card" aria-labelledby="month-title">
+      <h2 id="month-title">This month <span id="month-label" class="muted"></span></h2>
+      <div class="summary">
+        <div class="summary-item">
+          <span class="summary-label">Money in</span>
+          <span id="total-in" class="summary-value money-in">$0.00</span>
+        </div>
+        <div class="summary-item">
+          <span class="summary-label">Money out</span>
+          <span id="total-out" class="summary-value">$0.00</span>
+        </div>
+        <div class="summary-item summary-left">
+          <span class="summary-label">Left this month</span>
+          <span id="total-left" class="summary-value">$0.00</span>
+        </div>
+      </div>
+      <p id="left-note" class="gentle-note" hidden></p>
+    </section>
+
+    <!-- Tasks 1.1, 1.3, 1.4: one form to add OR edit an entry. -->
+    <section class="card" aria-labelledby="form-title">
+      <h2 id="form-title">Add an entry</h2>
+      <!-- novalidate: we check the amount ourselves, with a friendly message. -->
+      <form id="entry-form" novalidate>
+        <div class="type-toggle" role="group" aria-label="Type of entry">
+          <button type="button" class="type-button" data-type="expense" aria-pressed="true">Money out</button>
+          <button type="button" class="type-button" data-type="income" aria-pressed="false">Money in</button>
+        </div>
+
+        <label for="amount" class="field-label">Amount</label>
+        <!-- type="text" (not "number") so "12,50" with a comma is allowed.
+             inputmode="decimal" still shows the number keyboard on phones. -->
+        <input id="amount" class="amount-input" type="text" inputmode="decimal"
+               autocomplete="off" placeholder="0.00" autofocus>
+
+        <fieldset class="category-field">
+          <legend class="field-label">Category</legend>
+          <!-- app.js fills this with one button per category. -->
+          <div id="category-buttons" class="category-grid"></div>
+        </fieldset>
+
+        <label for="note" class="field-label">Note <span class="muted">(optional)</span></label>
+        <input id="note" type="text" maxlength="80" autocomplete="off" placeholder="e.g. Lunch with Sam">
+
+        <label for="date" class="field-label">Date</label>
+        <input id="date" type="date">
+
+        <!-- role="status" makes screen readers read new messages out loud. -->
+        <p id="form-message" class="form-message" role="status" aria-live="polite"></p>
+
+        <div class="form-actions">
+          <button type="submit" id="save-button" class="primary-button">Save</button>
+          <button type="button" id="cancel-edit" class="secondary-button" hidden>Cancel</button>
+        </div>
+
+        <!-- Task 1.3: only shown while editing. Two steps so a slip of the
+             thumb can't delete anything. -->
+        <div id="delete-area" class="delete-area" hidden>
+          <button type="button" id="delete-button" class="quiet-button">Delete this entry</button>
+          <div id="delete-confirm" class="delete-confirm" hidden>
+            <p>Delete this entry for good?</p>
+            <div class="form-actions">
+              <button type="button" id="confirm-delete" class="secondary-button">Yes, delete</button>
+              <button type="button" id="keep-entry" class="primary-button">Keep it</button>
+            </div>
+          </div>
+        </div>
+      </form>
+    </section>
+
+    <!-- Task 1.5: totals per category. -->
+    <section class="card" aria-labelledby="categories-title">
+      <h2 id="categories-title">Where it went</h2>
+      <ul id="category-totals" class="category-totals"></ul>
+      <p id="categories-empty" class="empty-message">Nothing spent yet this month.</p>
+    </section>
+
+    <!-- Task 1.2: this month's entries, newest first. -->
+    <section class="card" aria-labelledby="list-title">
+      <h2 id="list-title">Entries</h2>
+      <p id="list-hint" class="muted small">Tap an entry to edit or delete it.</p>
+      <ul id="entry-list" class="entry-list"></ul>
+      <p id="list-empty" class="empty-message">Nothing logged yet this month. Your first entry takes about 5 seconds.</p>
+    </section>
+  </main>
+
+  <!-- Plain scripts, loaded in this order (no modules, so it works from file://).
+       logic.js first because storage.js and app.js use its functions. -->
+  <script src="logic.js"></script>
+  <script src="storage.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

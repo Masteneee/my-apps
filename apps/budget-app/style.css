@@ -1,0 +1,395 @@
+/* style.css: all the styling.
+   Written "phone first": the basic rules are for a narrow screen, and the
+   @media rule at the bottom only adds a little space on bigger screens. */
+
+/* ---------- Colours and sizes in one place ----------
+   These are "custom properties" (CSS variables). Change a colour here and it
+   changes everywhere. No red anywhere on purpose: calm, not alarming. */
+:root {
+  --background: #f4f6f3;
+  --card: #ffffff;
+  --text: #1f2a2e;
+  --muted: #5f6c70;
+  --border: #d9dfdc;
+  --accent: #2f6f6a;        /* teal: buttons and selected things */
+  --accent-soft: #e2efed;   /* light teal: selected category background */
+  --money-in: #2d6a3e;      /* green for money coming in */
+  --bar: #9cc5bf;
+  --radius: 14px;
+  --tap: 48px;              /* minimum height of anything you tap (see LEARNING 1.6) */
+}
+
+/* Make width include padding and border, so "width: 100%" never overflows. */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--background);
+  color: var(--text);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-size: 1rem;          /* 1rem = the browser's base size, usually 16px */
+  line-height: 1.45;
+}
+
+/* One centred column. On a phone it fills the width (minus 16px each side);
+   on a laptop it stops at 34rem so lines don't get too long. */
+.app-header,
+main {
+  max-width: 34rem;
+  margin: 0 auto;
+  padding: 0 16px;
+}
+
+.app-header {
+  padding-top: 20px;
+}
+
+h1 {
+  margin: 0;
+  font-size: 1.6rem;
+}
+
+h2 {
+  margin: 0 0 12px;
+  font-size: 1.15rem;
+}
+
+.tagline,
+.muted {
+  color: var(--muted);
+  font-weight: normal;
+}
+
+.tagline {
+  margin: 4px 0 16px;
+}
+
+.small {
+  font-size: 0.9rem;
+  margin: -4px 0 8px;
+}
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+/* ---------- Month summary ---------- */
+
+/* Grid: two equal columns. "Left this month" spans both columns below. */
+.summary {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.summary-item {
+  display: flex;
+  flex-direction: column;   /* label on top, number below */
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--background);
+}
+
+.summary-left {
+  grid-column: 1 / -1;      /* from the first column line to the last one */
+  background: var(--accent-soft);
+}
+
+.summary-label {
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+
+.summary-value {
+  font-size: 1.3rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums; /* every digit the same width, so numbers line up */
+}
+
+.summary-left .summary-value {
+  font-size: 1.7rem;
+}
+
+.money-in {
+  color: var(--money-in);
+}
+
+.gentle-note {
+  margin: 10px 0 0;
+  color: var(--muted);
+  font-size: 0.95rem;
+}
+
+/* ---------- Form ---------- */
+
+.field-label {
+  display: block;
+  margin: 14px 0 6px;
+  font-weight: 600;
+}
+
+input {
+  width: 100%;
+  min-height: var(--tap);
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  /* 16px or more: below that, iPhones zoom in on the field when you tap it. */
+  font-size: 1rem;
+  font-family: inherit;
+  color: var(--text);
+  background: #fff;
+}
+
+input:focus,
+button:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* The amount is the star of the form: big and first. */
+.amount-input {
+  font-size: 2rem;
+  font-weight: 700;
+  padding: 8px 14px;
+  min-height: 64px;
+}
+
+fieldset {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-width: 0; /* stops a fieldset from refusing to shrink on small screens */
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  min-height: var(--tap);
+  border-radius: 10px;
+}
+
+/* Two halves: Money out | Money in */
+.type-toggle {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  padding: 4px;
+  background: var(--background);
+  border-radius: 12px;
+}
+
+.type-button {
+  border: 0;
+  background: transparent;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+/* [aria-pressed="true"] picks only the button that is switched on. */
+.type-button[aria-pressed="true"] {
+  background: var(--card);
+  color: var(--text);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+}
+
+/* Category buttons: 3 per row on a phone (6 categories = 2 tidy rows). */
+.category-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.category-button {
+  border: 1px solid var(--border);
+  background: var(--card);
+  padding: 8px 4px;
+  font-size: 0.95rem;
+}
+
+.category-button[aria-pressed="true"] {
+  border: 2px solid var(--accent);
+  background: var(--accent-soft);
+  font-weight: 600;
+}
+
+.form-message {
+  min-height: 1.45em;       /* keep the space so the buttons don't jump */
+  margin: 12px 0 4px;
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.form-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.form-actions button {
+  flex: 1;                  /* buttons in a row share the width equally */
+}
+
+.primary-button {
+  border: 0;
+  background: var(--accent);
+  color: #fff;
+  font-weight: 700;
+  font-size: 1.1rem;
+}
+
+.secondary-button {
+  border: 1px solid var(--border);
+  background: var(--card);
+}
+
+.quiet-button {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  text-decoration: underline;
+}
+
+.delete-area {
+  margin-top: 8px;
+}
+
+.delete-confirm {
+  padding: 12px;
+  border-radius: 10px;
+  background: var(--background);
+}
+
+.delete-confirm p {
+  margin: 0 0 10px;
+  font-weight: 600;
+}
+
+/* "hidden" must win even when a rule above says display: flex or grid. */
+[hidden] {
+  display: none !important;
+}
+
+/* ---------- Lists ---------- */
+
+ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.empty-message {
+  margin: 0;
+  color: var(--muted);
+}
+
+/* Category totals: a 2-column grid. Name on the left, amount on the right,
+   and the bar on its own row below, spanning both columns. */
+.category-row {
+  display: grid;
+  grid-template-columns: 1fr auto; /* 1fr = all leftover space, auto = just enough */
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.category-row:last-child {
+  border-bottom: 0;
+}
+
+.category-amount {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.category-bar {
+  grid-column: 1 / -1;      /* the whole row */
+  height: 6px;
+  margin-top: 6px;
+  border-radius: 3px;
+  background: var(--bar);
+  min-width: 4px;           /* even a tiny share stays visible */
+}
+
+/* Each entry is one big button: icon | category + note | amount + date */
+.entry {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 60px;
+  padding: 10px 8px;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+  background: transparent;
+  text-align: left;
+}
+
+.entry-list li:last-child .entry {
+  border-bottom: 0;
+}
+
+.entry:hover,
+.entry.is-editing {
+  background: var(--accent-soft);
+}
+
+.entry-icon {
+  font-size: 1.4rem;
+  width: 1.8rem;
+  text-align: center;
+}
+
+.entry-middle {
+  display: flex;
+  flex-direction: column;
+  flex: 1;                  /* take all the space left in the middle */
+  min-width: 0;             /* allow the note to shrink and get "..." */
+}
+
+.entry-category {
+  font-weight: 600;
+}
+
+.entry-note {
+  color: var(--muted);
+  font-size: 0.9rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;  /* a long note ends with "..." instead of breaking the row */
+}
+
+.entry-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.entry-amount {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.entry-date {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+/* ---------- Bigger screens ----------
+   Only applies when the window is at least 40rem (640px) wide. */
+@media (min-width: 40rem) {
+  .app-header {
+    padding-top: 40px;
+  }
+
+  .card {
+    padding: 20px 24px;
+  }
+}
