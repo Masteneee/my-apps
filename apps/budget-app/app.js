@@ -34,6 +34,11 @@ const totalInText = document.getElementById('total-in');
 const totalOutText = document.getElementById('total-out');
 const totalLeftText = document.getElementById('total-left');
 const leftNote = document.getElementById('left-note');
+const safeBox = document.getElementById('safe-box');
+const safeLine = document.getElementById('safe-line');
+const safePerDay = document.getElementById('safe-per-day');
+const safeUnit = document.getElementById('safe-unit');
+const safeDetail = document.getElementById('safe-detail');
 const categoryTotalsList = document.getElementById('category-totals');
 const categoriesEmpty = document.getElementById('categories-empty');
 const chartBox = document.getElementById('chart-box');
@@ -50,6 +55,27 @@ const exportButton = document.getElementById('export-button');
 const importButton = document.getElementById('import-button');
 const importFile = document.getElementById('import-file');
 const backupMessage = document.getElementById('backup-message');
+const goalList = document.getElementById('goal-list');
+const goalsEmpty = document.getElementById('goals-empty');
+const goalForm = document.getElementById('goal-form');
+const goalNameInput = document.getElementById('goal-name');
+const goalTargetInput = document.getElementById('goal-target');
+const goalDateInput = document.getElementById('goal-date');
+const goalMessage = document.getElementById('goal-message');
+const planMonth = document.getElementById('plan-month');
+const budgetList = document.getElementById('budget-list');
+const budgetsEmpty = document.getElementById('budgets-empty');
+const budgetForm = document.getElementById('budget-form');
+const budgetCategorySelect = document.getElementById('budget-category');
+const budgetAmountInput = document.getElementById('budget-amount');
+const budgetMessage = document.getElementById('budget-message');
+const styleButtons = document.querySelectorAll('.style-button');
+const styleSimpleText = document.getElementById('style-simple-text');
+const splitBox = document.getElementById('split-box');
+const splitList = document.getElementById('split-list');
+const splitEmpty = document.getElementById('split-empty');
+const rolloverToggle = document.getElementById('rollover-toggle');
+const rolloverMessage = document.getElementById('rollover-message');
 
 // ---------- State: what the app remembers while the page is open ----------
 let entries = loadEntries(); // every entry ever saved (all months)
@@ -60,6 +86,11 @@ let messageTimer = null; // used to clear the "Saved" message after a moment
 let categoryChart = null; // the Chart.js chart, created the first time it's needed
 let viewedMonth = monthKey(todayISO()); // the month on screen, like "2026-11" (task 2.2)
 let hourlyWageCents = loadHourlyWageCents(); // cents per hour, or null if not set (task 2.3)
+let goals = loadGoals(); // savings goals (task 3.1)
+let goalNotice = null; // { id, text }: a short message under one goal, like "Added $20."
+let confirmingGoalId = null; // the goal showing "Delete this goal?", or null
+let budgets = loadBudgets(); // { Food: 20000, ... } monthly limits in cents (task 3.2)
+let settings = loadSettings(); // { budgetStyle: 'simple' or '503020', rollover: true/false } (3.4, 3.5)
 
 // A unique-enough id for a new entry: the time in base 36 plus random letters.
 function makeId() {
@@ -133,10 +164,14 @@ function render() {
   const previousEntries = entriesInMonth(entries, shiftMonth(viewedMonth, -1));
 
   renderMonthSwitcher(range, isThisMonth);
+  renderSafeToSpend(monthEntries, today, isThisMonth);
   renderSummary(monthEntries, isThisMonth);
+  renderBudgetStyle(monthEntries);
+  renderBudgets(monthEntries, previousEntries);
   renderCategoryTotals(monthEntries, isThisMonth);
   renderComparison(monthEntries, previousEntries, todayKey);
   renderEntryList(monthEntries, today, isThisMonth);
+  renderGoals();
 }
 
 // Task 2.2: the month name, and which switcher buttons make sense right now.
@@ -147,6 +182,21 @@ function renderMonthSwitcher(range, isThisMonth) {
   prevMonthButton.disabled = viewedMonth <= range.first;
   nextMonthButton.disabled = viewedMonth >= range.last;
   backToTodayButton.hidden = isThisMonth;
+}
+
+// Task 3.3: "Safe to spend: $12.34 a day". All the math is in logic.js.
+// When nothing extra is available we never show $0.00 or a minus sign:
+// the big number is hidden and only the calm sentence stays.
+function renderSafeToSpend(monthEntries, today, isThisMonth) {
+  safeBox.hidden = !isThisMonth; // looking back at October: "days left" makes no sense
+  if (!isThisMonth) return;
+  const safe = safeToSpend(monthEntries, goals, budgets, today);
+  const hasSome = safe.perDayCents > 0;
+  safeLine.hidden = !hasSome;
+  safePerDay.textContent = formatCents(safe.perDayCents);
+  safeUnit.textContent = safe.daysLeft === 1 ? 'today' : 'a day';
+  safeDetail.textContent = safeToSpendDetail(safe);
+  safeDetail.classList.toggle('is-note', !hasSome); // the note alone reads a bit bigger
 }
 
 function renderSummary(monthEntries, isThisMonth) {
@@ -528,11 +578,398 @@ wageForm.addEventListener('submit', (event) => {
 
 clearWageButton.addEventListener('click', () => setWage(null, 'Wage cleared. Hours of work are hidden.'));
 
+// ---------- Task 3.2: monthly budget per category ----------
+
+// The category menu in "Set a budget": one <option> per expense category.
+function renderBudgetOptions() {
+  for (const category of EXPENSE_CATEGORIES) {
+    const option = document.createElement('option');
+    option.value = category;
+    option.textContent = CATEGORY_ICONS[category] + ' ' + category;
+    budgetCategorySelect.appendChild(option);
+  }
+}
+
+// Puts the saved budget of the chosen category in the amount box (or empties
+// it), so changing a budget is: pick the category, type, save.
+function fillBudgetAmount() {
+  const cents = budgets[budgetCategorySelect.value];
+  budgetAmountInput.value = cents ? centsToInputValue(cents) : '';
+}
+
+// One row per budget: "Food  $120.00 of $200.00", a bar, and a calm sentence.
+// Task 3.5: with rollover on, limits include last month's unspent part.
+function renderBudgets(monthEntries, previousEntries) {
+  planMonth.textContent = monthLabel(viewedMonth);
+  rolloverToggle.checked = settings.rollover;
+  const { limits, rolledOver } = effectiveLimits(budgets, previousEntries, settings.rollover);
+  const rows = budgetRows(monthEntries, limits, rolledOver);
+  budgetList.innerHTML = '';
+  budgetsEmpty.hidden = rows.length > 0;
+
+  for (const row of rows) {
+    const item = document.createElement('li');
+    item.className = 'budget-row';
+
+    const top = document.createElement('div');
+    top.className = 'goal-top';
+    const name = document.createElement('span');
+    name.className = 'goal-name';
+    name.textContent = CATEGORY_ICONS[row.category] + ' ' + row.category;
+    const amounts = document.createElement('span');
+    amounts.className = 'goal-amounts';
+    amounts.textContent = formatCents(row.spentCents) + ' of ' + formatCents(row.limitCents);
+    top.append(name, amounts);
+
+    // Same bar as the goals, in the category's own calm colour. Going over
+    // just means a full bar: no red, no flashing.
+    const bar = document.createElement('div');
+    bar.className = 'progress';
+    bar.setAttribute('role', 'progressbar');
+    bar.setAttribute('aria-valuemin', '0');
+    bar.setAttribute('aria-valuemax', '100');
+    bar.setAttribute('aria-valuenow', String(row.percent));
+    bar.setAttribute('aria-label', row.category + ' budget used');
+    const fill = document.createElement('span');
+    fill.className = 'progress-fill';
+    fill.style.width = row.percent + '%';
+    fill.style.background = CATEGORY_COLORS[row.category] || '';
+    bar.appendChild(fill);
+
+    const bottom = document.createElement('div');
+    bottom.className = 'budget-bottom';
+    const status = document.createElement('span');
+    status.className = 'budget-status';
+    status.textContent = budgetStatusText(row);
+    const remove = document.createElement('button');
+    remove.type = 'button';
+    remove.className = 'quiet-button small-action';
+    remove.dataset.category = row.category;
+    remove.textContent = 'Remove';
+    remove.setAttribute('aria-label', 'Remove the ' + row.category + ' budget');
+    bottom.append(status, remove);
+
+    item.append(top, bar);
+
+    // Task 3.5: "Includes $20 not spent in October", right under the bar.
+    const rolloverLine = rolloverText(row.rolledOverCents, shiftMonth(viewedMonth, -1));
+    if (rolloverLine !== '') {
+      const note = document.createElement('p');
+      note.className = 'goal-detail rollover-note';
+      note.textContent = rolloverLine;
+      item.appendChild(note);
+    }
+    item.appendChild(bottom);
+    budgetList.appendChild(item);
+  }
+}
+
+function commitBudgets(newBudgets) {
+  budgets = newBudgets;
+  const ok = saveBudgets(budgets);
+  render();
+  return ok;
+}
+
+budgetCategorySelect.addEventListener('change', () => {
+  fillBudgetAmount();
+  budgetMessage.textContent = '';
+});
+
+budgetForm.addEventListener('submit', (event) => {
+  event.preventDefault();
+  const category = budgetCategorySelect.value;
+  const cents = parseAmountToCents(budgetAmountInput.value);
+  if (cents === null) {
+    budgetMessage.textContent = 'Type an amount per month, like 200 or 49,99.';
+    budgetAmountInput.focus();
+    return;
+  }
+  const ok = commitBudgets(setBudget(budgets, category, cents));
+  budgetMessage.textContent = ok
+    ? 'Saved: ' + formatCentsShort(cents) + ' a month for ' + category + '.'
+    : 'Saved for now, but this browser would not save it.';
+});
+
+// Event delegation again: one listener for every "Remove" button in the list.
+budgetList.addEventListener('click', (event) => {
+  const button = event.target.closest('button[data-category]');
+  if (!button) return;
+  const category = button.dataset.category;
+  commitBudgets(setBudget(budgets, category, null));
+  if (budgetCategorySelect.value === category) fillBudgetAmount();
+  budgetMessage.textContent = category + ' budget removed.';
+});
+
+// ---------- Task 3.5: rollover ----------
+
+// "change" fires when the box is ticked or unticked (by tap, click or keyboard).
+rolloverToggle.addEventListener('change', () => {
+  settings = { ...settings, rollover: rolloverToggle.checked };
+  const ok = saveSettings(settings);
+  render();
+  if (!ok) rolloverMessage.textContent = 'Changed for now, but this browser would not save it.';
+  else if (settings.rollover) rolloverMessage.textContent = 'Rollover is on. Unspent budget from last month is added to this month.';
+  else rolloverMessage.textContent = 'Rollover is off. Each month starts with its plain budget.';
+});
+
+// ---------- Task 3.4: budget styles ----------
+
+// The Simple / 50/30/20 switch, and the split rows when 50/30/20 is picked.
+function renderBudgetStyle(monthEntries) {
+  const is503020 = settings.budgetStyle === '503020';
+  for (const button of styleButtons) {
+    button.setAttribute('aria-pressed', String(button.dataset.style === settings.budgetStyle));
+  }
+  styleSimpleText.hidden = is503020;
+  splitBox.hidden = !is503020;
+  if (!is503020) return;
+
+  const split = fiftyThirtyTwenty(monthEntries, goals, viewedMonth);
+  splitList.innerHTML = '';
+  // The guide is a share of money in: with no money in, there's nothing to share.
+  splitEmpty.hidden = split.inCents > 0;
+  splitEmpty.textContent = 'Add your money in for ' + monthLabel(viewedMonth) + ' to see your 50/30/20 split.';
+  if (split.inCents === 0) return;
+
+  for (const row of split.rows) {
+    const item = document.createElement('li');
+    item.className = 'budget-row';
+    const top = document.createElement('div');
+    top.className = 'goal-top';
+    const name = document.createElement('span');
+    name.className = 'goal-name';
+    name.textContent = row.group + ' (' + row.guidePercent + '%)';
+    const text = document.createElement('span');
+    text.className = 'goal-amounts';
+    text.textContent = splitRowText(row);
+    top.append(name, text);
+
+    const bar = document.createElement('div');
+    bar.className = 'progress';
+    bar.setAttribute('role', 'progressbar');
+    bar.setAttribute('aria-valuemin', '0');
+    bar.setAttribute('aria-valuemax', '100');
+    bar.setAttribute('aria-valuenow', String(row.percent));
+    bar.setAttribute('aria-label', row.group + ' compared with the guide');
+    const fill = document.createElement('span');
+    fill.className = 'progress-fill';
+    fill.style.width = row.percent + '%';
+    bar.appendChild(fill);
+
+    item.append(top, bar);
+    splitList.appendChild(item);
+  }
+}
+
+function setBudgetStyle(style) {
+  settings = { ...settings, budgetStyle: style };
+  saveSettings(settings);
+  render();
+}
+
+for (const button of styleButtons) {
+  button.addEventListener('click', () => setBudgetStyle(button.dataset.style));
+}
+
+// ---------- Task 3.1: savings goals ----------
+
+// One list item per goal: name, "$X of $Y", a progress bar, an "Add money"
+// box and a delete button (with a confirm step, like entries).
+function renderGoals() {
+  goalList.innerHTML = '';
+  goalsEmpty.hidden = goals.length > 0;
+
+  for (const goal of goals) {
+    const savedCents = goalSavedCents(goal);
+    const percent = goalPercent(savedCents, goal.targetCents);
+    const reached = percent === 100;
+
+    const item = document.createElement('li');
+    item.className = 'goal';
+
+    const top = document.createElement('div');
+    top.className = 'goal-top';
+    const name = document.createElement('span');
+    name.className = 'goal-name';
+    name.textContent = goal.name; // textContent: a name like "<b>" stays plain text
+    const amounts = document.createElement('span');
+    amounts.className = 'goal-amounts';
+    amounts.textContent = formatCents(savedCents) + ' of ' + formatCents(goal.targetCents);
+    top.append(name, amounts);
+
+    // The bar: an outer box (the track) and an inner one whose width is the percent.
+    // role="progressbar" + aria-valuenow let screen readers say "42 percent".
+    const bar = document.createElement('div');
+    bar.className = 'progress';
+    bar.setAttribute('role', 'progressbar');
+    bar.setAttribute('aria-valuemin', '0');
+    bar.setAttribute('aria-valuemax', '100');
+    bar.setAttribute('aria-valuenow', String(percent));
+    bar.setAttribute('aria-label', goal.name + ' progress');
+    const fill = document.createElement('span');
+    fill.className = 'progress-fill';
+    fill.style.width = percent + '%';
+    bar.appendChild(fill);
+
+    const detail = document.createElement('p');
+    detail.className = 'goal-detail';
+    const parts = [reached ? 'Reached! Nice work.' : percent + '%'];
+    if (goal.targetDate !== null) parts.push('by ' + formatLongDate(goal.targetDate));
+    detail.textContent = parts.join(' · ');
+
+    // Task 3.3: what this goal needs this month (it's part of "safe to spend").
+    const plan = document.createElement('p');
+    plan.className = 'goal-detail';
+    plan.textContent = goalPlanText(goal, monthKey(todayISO()));
+    plan.hidden = plan.textContent === '';
+
+    item.append(top, bar, detail, plan);
+    item.appendChild(makeDepositForm(goal));
+
+    const notice = document.createElement('p');
+    notice.className = 'form-message goal-notice';
+    notice.setAttribute('role', 'status');
+    notice.textContent = goalNotice !== null && goalNotice.id === goal.id ? goalNotice.text : '';
+    item.appendChild(notice);
+
+    item.appendChild(makeGoalDeleteArea(goal));
+    goalList.appendChild(item);
+  }
+}
+
+// The small "Add money" form inside a goal. data-id tells the listener which goal.
+function makeDepositForm(goal) {
+  const depositForm = document.createElement('form');
+  depositForm.className = 'deposit-form';
+  depositForm.dataset.id = goal.id;
+  depositForm.noValidate = true;
+
+  const inputId = 'deposit-' + goal.id;
+  const label = document.createElement('label');
+  label.className = 'visually-hidden'; // read by screen readers, not shown
+  label.htmlFor = inputId;
+  label.textContent = 'Amount to add to ' + goal.name;
+  const input = document.createElement('input');
+  input.id = inputId;
+  input.className = 'deposit-input';
+  input.type = 'text';
+  input.inputMode = 'decimal';
+  input.autocomplete = 'off';
+  input.placeholder = 'e.g. 20';
+  const button = document.createElement('button');
+  button.type = 'submit';
+  button.className = 'secondary-button';
+  button.textContent = 'Add money';
+
+  depositForm.append(label, input, button);
+  return depositForm;
+}
+
+function makeGoalDeleteArea(goal) {
+  const area = document.createElement('div');
+  area.className = 'delete-area';
+  if (confirmingGoalId !== goal.id) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'quiet-button';
+    button.dataset.action = 'ask-delete-goal';
+    button.dataset.id = goal.id;
+    button.textContent = 'Delete goal';
+    area.appendChild(button);
+    return area;
+  }
+  const confirmBox = document.createElement('div');
+  confirmBox.className = 'delete-confirm';
+  const question = document.createElement('p');
+  question.textContent = 'Delete "' + goal.name + '" for good?';
+  const actions = document.createElement('div');
+  actions.className = 'form-actions';
+  const yes = document.createElement('button');
+  yes.type = 'button';
+  yes.className = 'secondary-button';
+  yes.dataset.action = 'delete-goal';
+  yes.dataset.id = goal.id;
+  yes.textContent = 'Yes, delete';
+  const keep = document.createElement('button');
+  keep.type = 'button';
+  keep.className = 'primary-button';
+  keep.dataset.action = 'keep-goal';
+  keep.textContent = 'Keep it';
+  actions.append(yes, keep);
+  confirmBox.append(question, actions);
+  area.appendChild(confirmBox);
+  return area;
+}
+
+// Saves the goals and redraws everything (safe to spend depends on goals too).
+function commitGoals(newGoals) {
+  goals = newGoals;
+  const ok = saveGoals(goals);
+  render();
+  return ok;
+}
+
+goalForm.addEventListener('submit', (event) => {
+  event.preventDefault();
+  const result = validateGoalInput(goalNameInput.value, goalTargetInput.value, goalDateInput.value, todayISO());
+  if (!result.ok) {
+    goalMessage.textContent = result.message;
+    return;
+  }
+  const goal = { id: makeId(), ...result.fields, deposits: [], createdAt: Date.now() };
+  const ok = commitGoals([...goals, goal]);
+  goalForm.reset(); // empties the three boxes
+  goalMessage.textContent = ok
+    ? 'Goal created: ' + goal.name + '. Add money to it whenever you like.'
+    : 'Created for now, but this browser would not save it.';
+});
+
+// One "submit" listener for every "Add money" form in the list (event delegation:
+// submit events "bubble up" from the small form to the list).
+goalList.addEventListener('submit', (event) => {
+  event.preventDefault();
+  const depositForm = event.target.closest('.deposit-form');
+  if (!depositForm) return;
+  const goalId = depositForm.dataset.id;
+  const amountCents = parseAmountToCents(depositForm.querySelector('.deposit-input').value);
+  if (amountCents === null) {
+    goalNotice = { id: goalId, text: 'Type an amount like 20 or 12,50.' };
+    renderGoals();
+    return;
+  }
+  goalNotice = { id: goalId, text: 'Added ' + formatCents(amountCents) + '.' };
+  const ok = commitGoals(addDeposit(goals, goalId, amountCents, todayISO()));
+  if (!ok) {
+    goalNotice = { id: goalId, text: 'Added for now, but this browser would not save it.' };
+    renderGoals();
+  }
+});
+
+goalList.addEventListener('click', (event) => {
+  const button = event.target.closest('button[data-action]');
+  if (!button) return;
+  const action = button.dataset.action;
+  if (action === 'ask-delete-goal') {
+    confirmingGoalId = button.dataset.id;
+    renderGoals();
+    // The safe choice gets the focus, like when deleting an entry.
+    goalList.querySelector('[data-action="keep-goal"]').focus();
+  } else if (action === 'keep-goal') {
+    confirmingGoalId = null;
+    renderGoals();
+  } else if (action === 'delete-goal') {
+    confirmingGoalId = null;
+    commitGoals(deleteGoal(goals, button.dataset.id));
+    goalMessage.textContent = 'Goal deleted.';
+  }
+});
+
 // ---------- Task 2.4: export and import ----------
 
 // Builds the backup as text and makes the browser download it as a file.
 function handleExport() {
-  const backup = buildBackup(entries, hourlyWageCents, new Date().toISOString());
+  const backup = buildBackup(entries, hourlyWageCents, new Date().toISOString(), { goals, budgets, settings });
   // null, 2 = indent with 2 spaces, so the file is readable in a text editor.
   const text = JSON.stringify(backup, null, 2);
 
@@ -550,7 +987,8 @@ function handleExport() {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 
   backupMessage.textContent = 'Backup exported (' + entries.length +
-    (entries.length === 1 ? ' entry' : ' entries') + '). Keep the file somewhere safe, like your cloud drive.';
+    (entries.length === 1 ? ' entry' : ' entries') + ', ' + goals.length + (goals.length === 1 ? ' goal' : ' goals') +
+    '). Keep the file somewhere safe, like your cloud drive.';
 }
 
 // Runs when a file was picked. "async" lets us "await" reading the file,
@@ -592,9 +1030,31 @@ async function handleImportFile() {
     wageRestored = true;
   }
 
-  const ok = commit(merged.entries);
+  // Task 3.1: goals follow the same rule as entries (add, never delete).
+  const mergedGoals = mergeById(goals, result.goals);
+  goals = mergedGoals.items;
+  const goalsOk = saveGoals(goals);
+
+  // Task 3.2: budgets only fill categories that have none here.
+  const mergedBudgets = mergeBudgets(budgets, result.budgets);
+  budgets = mergedBudgets.budgets;
+  const budgetsOk = saveBudgets(budgets);
+  fillBudgetAmount();
+
+  // Task 3.4: settings from the file only if the ones here were never changed.
+  const mergedSettings = mergeSettings(settings, result.settings);
+  settings = mergedSettings.settings;
+  const settingsOk = saveSettings(settings);
+
+  const ok = commit(merged.entries) && goalsOk && budgetsOk && settingsOk; // commit() also redraws the page
+  const extras = {
+    goalsAdded: mergedGoals.addedCount,
+    goalsSkipped: result.skippedGoalCount,
+    budgetsRestored: mergedBudgets.restoredCount,
+    settingsRestored: mergedSettings.restored,
+  };
   backupMessage.textContent = ok
-    ? importSummary(merged.addedCount, merged.alreadyHereCount, result.skippedCount, wageRestored)
+    ? importSummary(merged.addedCount, merged.alreadyHereCount, result.skippedCount, wageRestored, extras)
     : 'Loaded for now, but this browser would not save it. It may be in private mode.';
 }
 
@@ -603,6 +1063,8 @@ importButton.addEventListener('click', () => importFile.click()); // opens the f
 importFile.addEventListener('change', handleImportFile);
 
 // ---------- Start ----------
+renderBudgetOptions();
+fillBudgetAmount();
 resetForm();
 renderWage();
 render();

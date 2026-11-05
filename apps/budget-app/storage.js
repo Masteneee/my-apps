@@ -68,3 +68,87 @@ function saveHourlyWageCents(wageCents) {
     return false;
   }
 }
+
+// ---------- Task 3.1: savings goals ----------
+// Saved under their own key, like the wage, so the entries list stays only entries.
+const GOALS_KEY = 'budget-app.v1.goals';
+
+// Returns the saved goals, or an empty list. cleanGoal (logic.js) checks each
+// one, so a single broken goal is dropped instead of crashing the page.
+function loadGoals() {
+  try {
+    const text = localStorage.getItem(GOALS_KEY);
+    if (text === null) return [];
+    const data = JSON.parse(text);
+    if (!Array.isArray(data)) return [];
+    return data.map(cleanGoal).filter((goal) => goal !== null);
+  } catch (error) {
+    console.warn('Could not load saved goals:', error);
+    return [];
+  }
+}
+
+// Saves the whole list of goals. Returns true if it worked.
+function saveGoals(goals) {
+  try {
+    localStorage.setItem(GOALS_KEY, JSON.stringify(goals));
+    return true;
+  } catch (error) {
+    console.warn('Could not save goals:', error);
+    return false;
+  }
+}
+
+// ---------- Task 3.2: monthly budget per category ----------
+// One object, category -> limit in cents: { "Food": 20000, "Fun": 5000 }.
+const BUDGETS_KEY = 'budget-app.v1.budgets';
+
+// Returns the saved budgets, or {} if none. cleanBudgets (logic.js) drops
+// anything that isn't a known category with a whole number of cents.
+function loadBudgets() {
+  try {
+    const text = localStorage.getItem(BUDGETS_KEY);
+    if (text === null) return {};
+    return cleanBudgets(JSON.parse(text));
+  } catch (error) {
+    console.warn('Could not load budgets:', error);
+    return {};
+  }
+}
+
+// Saves all budgets. Returns true if it worked.
+function saveBudgets(budgets) {
+  try {
+    localStorage.setItem(BUDGETS_KEY, JSON.stringify(budgets));
+    return true;
+  } catch (error) {
+    console.warn('Could not save budgets:', error);
+    return false;
+  }
+}
+
+// ---------- Task 3.4: settings (budget style; rollover since 3.5) ----------
+const SETTINGS_KEY = 'budget-app.v1.settings';
+
+// Always returns a full settings object: cleanSettings (logic.js) fills in a
+// default for anything missing, so the first visit just gets the defaults.
+function loadSettings() {
+  try {
+    const text = localStorage.getItem(SETTINGS_KEY);
+    return cleanSettings(text === null ? {} : JSON.parse(text));
+  } catch (error) {
+    console.warn('Could not load settings:', error);
+    return cleanSettings({});
+  }
+}
+
+// Saves the settings. Returns true if it worked.
+function saveSettings(settings) {
+  try {
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+    return true;
+  } catch (error) {
+    console.warn('Could not save settings:', error);
+    return false;
+  }
+}

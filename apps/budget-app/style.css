@@ -98,7 +98,7 @@ h2 {
 
 .summary-left {
   grid-column: 1 / -1;      /* from the first column line to the last one */
-  background: var(--accent-soft);
+  /* Grey since task 3.3: the teal box is now "Safe to spend", the star number. */
 }
 
 .summary-label {
@@ -459,4 +459,238 @@ button:disabled {
 .hint {
   margin: -2px 0 8px;
   font-size: 0.9rem;
+}
+
+/* ---------- 3.1 Savings goals ---------- */
+
+/* Hidden on screen but still read by screen readers (a label for a box whose
+   meaning is already clear from what's around it). */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.sub-title {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.goal {
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.goal:first-child {
+  padding-top: 0;
+}
+
+.goal-top {
+  display: flex;
+  justify-content: space-between; /* name on the left, amounts on the right */
+  gap: 8px;
+  flex-wrap: wrap;                /* on a narrow phone the amounts move below */
+}
+
+.goal-name {
+  font-weight: 600;
+  overflow-wrap: anywhere;        /* a very long word can't push the page wider */
+}
+
+.goal-amounts {
+  font-variant-numeric: tabular-nums;
+}
+
+/* The progress bar: a light track with a teal fill inside. */
+.progress {
+  height: 10px;
+  margin: 8px 0 4px;
+  border-radius: 5px;
+  background: var(--accent-soft);
+  overflow: hidden;               /* keeps the fill's corners rounded */
+}
+
+.progress-fill {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+}
+
+.goal-detail {
+  margin: 0 0 8px;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+/* Amount box and "Add money" button on one row: the box takes the space left. */
+.deposit-form {
+  display: flex;
+  gap: 8px;
+}
+
+.deposit-form input {
+  flex: 1;
+  min-width: 0;
+}
+
+.deposit-form button {
+  flex: none;
+  padding: 0 14px;
+}
+
+.goal-notice {
+  margin: 6px 0 0;
+  min-height: 0;
+}
+
+.goal-notice:empty {
+  display: none;                  /* no empty gap when there's no message */
+}
+
+.goal-form {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+/* ---------- 3.2 Monthly budget per category ---------- */
+
+select {
+  width: 100%;
+  min-height: var(--tap);
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font: inherit;
+  color: var(--text);
+  background: #fff;
+}
+
+select:focus {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.budget-row {
+  padding: 10px 0 4px;
+  border-bottom: 1px solid var(--border);
+}
+
+.budget-row:first-child {
+  padding-top: 0;
+}
+
+/* The sentence on the left, a small "Remove" on the right. */
+.budget-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.budget-status {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+/* A small text button that still has a full-height tap area. */
+.small-action {
+  width: auto;
+  flex: none;
+  padding: 0 4px;
+  font-size: 0.9rem;
+}
+
+.budget-form {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+/* ---------- 3.3 Safe to spend ----------
+   The first thing on the page: a soft teal box with one big number. */
+.safe-box {
+  padding: 12px 14px;
+  margin-bottom: 10px;
+  border-radius: 10px;
+  background: var(--accent-soft);
+}
+
+.safe-line {
+  margin: 2px 0 4px;
+}
+
+.safe-value {
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+
+.safe-detail {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+/* Two goal lines in a row: no double gap between them. */
+.goal-detail + .goal-detail {
+  margin-top: -6px;
+}
+
+.safe-detail.is-note {
+  margin-top: 4px;
+  color: var(--text);
+  font-size: 1rem;
+}
+
+/* ---------- 3.4 Budget styles ---------- */
+
+.style-text {
+  margin: 10px 0 12px;
+}
+
+.split-box {
+  margin-bottom: 12px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--border);
+}
+
+/* The split rows use the budget row look; the last one needs no line under it. */
+.split-box .budget-row:last-child {
+  border-bottom: 0;
+}
+
+.budget-title {
+  margin-bottom: 8px;
+}
+
+/* ---------- 3.5 Rollover ---------- */
+
+/* Checkbox and its text on one row, with a full-height tap area. */
+.check-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: var(--tap);
+  margin-top: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* The general "input" rule makes inputs 100% wide; a checkbox must stay small. */
+.check-row input {
+  width: 22px;
+  height: 22px;
+  min-height: 0;
+  margin: 0;
+  flex: none;
+  accent-color: var(--accent); /* the tick box in our teal instead of the browser's blue */
+}
+
+.rollover-note {
+  margin: 0;
 }

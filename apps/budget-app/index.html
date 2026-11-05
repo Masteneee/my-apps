@@ -25,6 +25,13 @@
         <button type="button" id="next-month" class="secondary-button">Next &rsaquo;</button>
       </div>
       <button type="button" id="back-to-today" class="quiet-button" hidden>Back to this month</button>
+      <!-- Task 3.3: the one number at the top. Only shown for the current month
+           (it's about the days left). The detail line explains the math. -->
+      <div id="safe-box" class="safe-box">
+        <span class="summary-label">Safe to spend</span>
+        <p id="safe-line" class="safe-line"><span id="safe-per-day" class="safe-value">$0.00</span> <span id="safe-unit" class="muted">a day</span></p>
+        <p id="safe-detail" class="safe-detail"></p>
+      </div>
       <div class="summary">
         <div class="summary-item">
           <span class="summary-label">Money in</span>
@@ -93,6 +100,72 @@
       </form>
     </section>
 
+    <!-- Task 3.2: a monthly budget per category. app.js fills #budget-list
+         with one row per budget, for the month on screen. -->
+    <section class="card" aria-labelledby="plan-title">
+      <h2 id="plan-title">Monthly plan <span id="plan-month" class="muted"></span></h2>
+
+      <!-- Task 3.4: budget style. Same look as the Money out / Money in switch. -->
+      <div class="type-toggle" role="group" aria-label="Budget style">
+        <button type="button" class="type-button style-button" data-style="simple" aria-pressed="true">Simple</button>
+        <button type="button" class="type-button style-button" data-style="503020" aria-pressed="false">50/30/20</button>
+      </div>
+      <p id="style-simple-text" class="muted hint style-text">Simple: just track where your money goes, with a budget per category if you like.</p>
+      <div id="split-box" class="split-box" hidden>
+        <p class="muted hint style-text">The 50/30/20 rule is a simple guide for your money in: about half for needs (things you must pay for), 30% for wants (fun extras) and 20% for savings. It's a starting point to adjust to your life, not a test you can fail.</p>
+        <p class="muted small">Needs: Food, Transport, School, Bills. Wants: Fun, Other. Savings: money added to your goals this month.</p>
+        <ul id="split-list" class="budget-list"></ul>
+        <p id="split-empty" class="empty-message" hidden></p>
+      </div>
+      <h3 class="sub-title budget-title">Budget per category</h3>
+      <ul id="budget-list" class="budget-list"></ul>
+      <p id="budgets-empty" class="empty-message">No budgets yet. A budget is a plan for how much you'd like to spend on one category each month. It's optional.</p>
+
+      <!-- Task 3.5: rollover on/off. A real checkbox: tapping the text works too,
+           because the <label> wraps the box. -->
+      <label class="check-row" for="rollover-toggle">
+        <input type="checkbox" id="rollover-toggle">
+        <span>Roll unspent budget over to next month</span>
+      </label>
+      <p class="muted hint">What you don't spend of a budget is added to the same budget next month. Only last month counts, and spending more never makes next month smaller.</p>
+      <p id="rollover-message" class="form-message" role="status" aria-live="polite"></p>
+
+      <form id="budget-form" class="budget-form" novalidate>
+        <h3 class="sub-title">Set a budget</h3>
+        <label for="budget-category" class="field-label">Category</label>
+        <!-- app.js adds one <option> per expense category. -->
+        <select id="budget-category"></select>
+        <label for="budget-amount" class="field-label">Per month</label>
+        <input id="budget-amount" type="text" inputmode="decimal" autocomplete="off" placeholder="e.g. 200">
+        <p id="budget-message" class="form-message" role="status" aria-live="polite"></p>
+        <div class="form-actions">
+          <button type="submit" class="primary-button">Save budget</button>
+        </div>
+      </form>
+    </section>
+
+    <!-- Task 3.1: savings goals. app.js draws one item per goal in #goal-list,
+         each with a progress bar, an "Add money" box and a delete button. -->
+    <section class="card" aria-labelledby="goals-title">
+      <h2 id="goals-title">Savings goals</h2>
+      <ul id="goal-list" class="goal-list"></ul>
+      <p id="goals-empty" class="empty-message">No goals yet. A goal can be anything: a bike, a trip, a cushion for surprises.</p>
+
+      <form id="goal-form" class="goal-form" novalidate>
+        <h3 class="sub-title">New goal</h3>
+        <label for="goal-name" class="field-label">Name</label>
+        <input id="goal-name" type="text" maxlength="40" autocomplete="off" placeholder="e.g. New bike">
+        <label for="goal-target" class="field-label">Amount to save</label>
+        <input id="goal-target" type="text" inputmode="decimal" autocomplete="off" placeholder="e.g. 300">
+        <label for="goal-date" class="field-label">By <span class="muted">(optional)</span></label>
+        <input id="goal-date" type="date">
+        <p id="goal-message" class="form-message" role="status" aria-live="polite"></p>
+        <div class="form-actions">
+          <button type="submit" class="primary-button">Create goal</button>
+        </div>
+      </form>
+    </section>
+
     <!-- Task 1.5: totals per category. -->
     <section class="card" aria-labelledby="categories-title">
       <h2 id="categories-title">Where it went</h2>
@@ -140,7 +213,7 @@
     <!-- Task 2.4: export and import, so clearing the browser never loses data. -->
     <section class="card" aria-labelledby="backup-title">
       <h2 id="backup-title">Backup</h2>
-      <p class="muted hint">Your data lives only in this browser. Export a backup now and then, and keep the file somewhere safe. Importing a backup adds its entries; it never deletes yours.</p>
+      <p class="muted hint">Your data lives only in this browser. Export a backup now and then, and keep the file somewhere safe. The backup holds your entries, goals, budgets and settings. Importing one adds what's missing; it never deletes yours.</p>
       <div class="form-actions">
         <button type="button" id="export-button" class="primary-button">Export backup</button>
         <button type="button" id="import-button" class="secondary-button">Import backup</button>

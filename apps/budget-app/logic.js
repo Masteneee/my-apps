@@ -373,27 +373,34 @@ function workTimeText(amountCents, wageCents) {
   return wholeHours.toLocaleString('en-US') + (tenth === 0 ? '' : '.' + tenth) + ' h';
 }
 
-// ---------- 2.4 Export and import ----------
+// ---------- 2.4 Export and import (version 2 since task 3.1) ----------
 // A backup file is JSON text shaped like:
-// { "app": "pocket-budget", "version": 1, "exportedAt": "2026-11-05T14:03:00.000Z",
-//   "hourlyWageCents": 1575, "entries": [ ...entries... ] }
+// { "app": "pocket-budget", "version": 2, "exportedAt": "2026-11-05T14:03:00.000Z",
+//   "hourlyWageCents": 1575, "entries": [ ...entries... ], "goals": [ ...goals... ] }
 // "app" and "version" let us recognise our own files and refuse anything else.
+// Version 1 files (from Phase 2) had no goals. We still read them: a missing
+// part is simply treated as empty. That's called "backward compatible".
 
 const BACKUP_APP = 'pocket-budget';
-const BACKUP_VERSION = 1;
+const BACKUP_VERSION = 2; // the version we WRITE
+const READABLE_BACKUP_VERSIONS = [1, 2]; // the versions we can READ
 const MAX_NOTE_LENGTH = 80; // same as maxlength on the note box
 const MAX_ID_LENGTH = 64; // our ids are about 13 characters; this is plenty
 const MAX_BACKUP_BYTES = 5 * 1024 * 1024; // 5 MB: tens of thousands of entries
 
 // The object we turn into the backup file. exportedAt is passed in (instead of
 // calling new Date() here) so the function stays pure and easy to test.
-function buildBackup(entries, hourlyWageCents, exportedAt) {
+// "extras" holds the Phase 3 data: { goals, budgets, settings }. Leaving it out gives empty parts.
+function buildBackup(entries, hourlyWageCents, exportedAt, extras = {}) {
   return {
     app: BACKUP_APP,
     version: BACKUP_VERSION,
     exportedAt,
     hourlyWageCents: isValidHourlyWage(hourlyWageCents) ? hourlyWageCents : null,
     entries,
+    goals: extras.goals || [],
+    budgets: extras.budgets || {},
+    settings: cleanSettings(extras.settings), // task 3.4
   };
 }
 
@@ -434,7 +441,8 @@ function cleanImportedEntry(raw) {
 
 // Reads the text of a backup file. Never throws.
 // Returns { ok: false, message } when the file can't be used (nothing changes),
-// or { ok: true, entries, skippedCount, hourlyWageCents } when it can.
+// or { ok: true, entries, skippedCount, hourlyWageCents, goals, skippedGoalCount,
+// budgets, settings } when it can (goals 3.1, budgets 3.2, settings 3.4).
 // skippedCount = entries in the file that didn't look right (or were repeated).
 function parseBackup(text) {
   let data;
@@ -449,7 +457,7 @@ function parseBackup(text) {
   if (!isObject || data.app !== BACKUP_APP) {
     return { ok: false, message: 'This file isn\'t a Pocket Budget backup. Nothing was changed.' };
   }
-  if (data.version !== BACKUP_VERSION) {
+  if (!READABLE_BACKUP_VERSIONS.includes(data.version)) {
     const isNewer = Number.isInteger(data.version) && data.version > BACKUP_VERSION;
     return {
       ok: false,
@@ -476,11 +484,31 @@ function parseBackup(text) {
     entries.push(entry);
   }
 
+  // Task 3.1: goals. A version 1 file has none, so "missing" means "empty list".
+  const goals = [];
+  const seenGoalIds = new Set();
+  let skippedGoalCount = 0;
+  const rawGoals = Array.isArray(data.goals) ? data.goals : [];
+  for (const raw of rawGoals) {
+    const goal = cleanGoal(raw);
+    if (goal === null || seenGoalIds.has(goal.id)) {
+      skippedGoalCount += 1;
+      continue;
+    }
+    seenGoalIds.add(goal.id);
+    goals.push(goal);
+  }
+
   return {
     ok: true,
     entries,
     skippedCount,
     hourlyWageCents: isValidHourlyWage(data.hourlyWageCents) ? data.hourlyWageCents : null,
+    goals,
+    skippedGoalCount,
+    budgets: cleanBudgets(data.budgets), // task 3.2; missing or broken gives {}
+    // Task 3.4: null means "this file has no settings" (so nothing is restored).
+    settings: data.settings === undefined ? null : cleanSettings(data.settings),
   };
 }
 
@@ -488,12 +516,19 @@ function parseBackup(text) {
 // if an entry with the same id is already here, the one here is kept.
 // Loading the same backup twice therefore changes nothing the second time.
 function mergeEntries(currentEntries, importedEntries) {
-  const idsHere = new Set(currentEntries.map((entry) => entry.id));
-  const newOnes = importedEntries.filter((entry) => !idsHere.has(entry.id));
+  const result = mergeById(currentEntries, importedEntries);
+  return { entries: result.items, addedCount: result.addedCount, alreadyHereCount: result.alreadyHereCount };
+}
+
+// The same "add, never delete, what's here wins" rule for any list of things
+// that have an id. Task 3.1 uses it for goals too.
+function mergeById(currentItems, importedItems) {
+  const idsHere = new Set(currentItems.map((item) => item.id));
+  const newOnes = importedItems.filter((item) => !idsHere.has(item.id));
   return {
-    entries: [...currentEntries, ...newOnes],
+    items: [...currentItems, ...newOnes],
     addedCount: newOnes.length,
-    alreadyHereCount: importedEntries.length - newOnes.length,
+    alreadyHereCount: importedItems.length - newOnes.length,
   };
 }
 
@@ -502,8 +537,15 @@ function countEntries(count) {
   return count + (count === 1 ? ' entry' : ' entries');
 }
 
+// "1 goal", "3 goals"
+function countGoals(count) {
+  return count + (count === 1 ? ' goal' : ' goals');
+}
+
 // The calm message shown after loading a backup.
-function importSummary(addedCount, alreadyHereCount, skippedCount, wageRestored) {
+// "extras" (task 3.1+) tells what else came back:
+// { goalsAdded, goalsSkipped, budgetsRestored, settingsRestored }.
+function importSummary(addedCount, alreadyHereCount, skippedCount, wageRestored, extras = {}) {
   const parts = [];
   if (addedCount > 0) parts.push('Added ' + countEntries(addedCount) + ' from the backup.');
   else parts.push('No new entries to add.');
@@ -514,7 +556,447 @@ function importSummary(addedCount, alreadyHereCount, skippedCount, wageRestored)
     parts.push(countEntries(skippedCount) + ' didn\'t look right and ' + (skippedCount === 1 ? 'was' : 'were') + ' left out.');
   }
   if (wageRestored) parts.push('Your hourly wage was restored too.');
+  if (extras.goalsAdded > 0) parts.push('Added ' + countGoals(extras.goalsAdded) + '.');
+  if (extras.goalsSkipped > 0) {
+    parts.push(countGoals(extras.goalsSkipped) + ' didn\'t look right and ' + (extras.goalsSkipped === 1 ? 'was' : 'were') + ' left out.');
+  }
+  if (extras.budgetsRestored > 0) {
+    parts.push('Restored ' + extras.budgetsRestored + (extras.budgetsRestored === 1 ? ' budget.' : ' budgets.'));
+  }
+  if (extras.settingsRestored) parts.push('Your budget settings were restored too.');
   return parts.join(' ');
+}
+
+// ---------- 3.1 Savings goals ----------
+// A goal looks like:
+// { id: 'g1', name: 'New bike', targetCents: 30000, targetDate: '2027-03-31' (or null),
+//   deposits: [{ amountCents: 2500, date: '2026-11-05' }], createdAt: 1793900000000 }
+// We keep every deposit (not just a running total) so we can tell how much was
+// added in a given month. "Safe to spend" (3.3) and 50/30/20 (3.4) need that.
+
+const MAX_GOAL_NAME_LENGTH = 40; // same as maxlength on the goal name box
+
+// "2027-03-31" -> "Mar 31, 2027". Goals can be far away, so the year matters here.
+function formatLongDate(isoDate) {
+  const year = isoDate.slice(0, 4);
+  const monthIndex = Number(isoDate.slice(5, 7)) - 1;
+  const day = Number(isoDate.slice(8, 10));
+  return MONTH_NAMES[monthIndex].slice(0, 3) + ' ' + day + ', ' + year;
+}
+
+// Everything put into the goal so far, in cents.
+function goalSavedCents(goal) {
+  let total = 0;
+  for (const deposit of goal.deposits) total += deposit.amountCents;
+  return total;
+}
+
+// How full the progress bar is, from 0 to 100. Rounded DOWN, so the bar only
+// says 100% when the goal is really reached ($299.99 of $300 shows 99%).
+function goalPercent(savedCents, targetCents) {
+  if (savedCents >= targetCents) return 100;
+  return Math.floor((savedCents * 100) / targetCents);
+}
+
+// Checks what was typed in the "New goal" form.
+// Returns { ok: true, fields: { name, targetCents, targetDate } }
+// or { ok: false, message } with a calm hint about what to fix.
+// todayIsoDate is passed in so the function stays pure (and testable).
+function validateGoalInput(nameText, amountText, dateText, todayIsoDate) {
+  const name = String(nameText || '').trim().slice(0, MAX_GOAL_NAME_LENGTH);
+  if (name === '') return { ok: false, message: 'Give your goal a name, like "New bike".' };
+
+  const targetCents = parseAmountToCents(String(amountText || ''));
+  if (targetCents === null) return { ok: false, message: 'Type the amount you want to save, like 300 or 299,99.' };
+
+  // The date is optional: an empty box means "no date, whenever I get there".
+  let targetDate = null;
+  if (dateText) {
+    if (!isRealDate(dateText)) return { ok: false, message: 'That date doesn\'t look right. Pick one, or leave it empty.' };
+    // "2026-11-04" < "2026-11-05" works as text because of the YYYY-MM-DD format.
+    if (dateText < todayIsoDate) return { ok: false, message: 'Pick today or a later date, or leave it empty.' };
+    targetDate = dateText;
+  }
+  return { ok: true, fields: { name, targetCents, targetDate } };
+}
+
+// Returns a NEW list where the goal with this id has one more deposit.
+function addDeposit(goals, goalId, amountCents, isoDate) {
+  return goals.map((goal) =>
+    goal.id === goalId
+      ? { ...goal, deposits: [...goal.deposits, { amountCents, date: isoDate }] }
+      : goal);
+}
+
+// Returns a NEW list without the goal that has this id.
+function deleteGoal(goals, goalId) {
+  return goals.filter((goal) => goal.id !== goalId);
+}
+
+// Checks one goal (from localStorage or from a backup file) and returns a
+// CLEAN copy, or null if it doesn't look right. Same idea as cleanImportedEntry:
+// copy only the fields we know, so anything extra is dropped.
+function cleanGoal(raw) {
+  if (typeof raw !== 'object' || raw === null) return null;
+  if (typeof raw.id !== 'string' || raw.id === '' || raw.id.length > MAX_ID_LENGTH) return null;
+  if (typeof raw.name !== 'string' || raw.name.trim() === '') return null;
+  if (!Number.isInteger(raw.targetCents) || raw.targetCents <= 0 || raw.targetCents > MAX_AMOUNT_CENTS) return null;
+  if (raw.targetDate !== null && !isRealDate(raw.targetDate)) return null;
+  if (!Array.isArray(raw.deposits) || !Number.isFinite(raw.createdAt)) return null;
+
+  const deposits = [];
+  for (const deposit of raw.deposits) {
+    const isGood = typeof deposit === 'object' && deposit !== null &&
+      Number.isInteger(deposit.amountCents) && deposit.amountCents > 0 &&
+      deposit.amountCents <= MAX_AMOUNT_CENTS && isRealDate(deposit.date);
+    if (!isGood) return null; // a broken deposit would make the total wrong: refuse the goal
+    deposits.push({ amountCents: deposit.amountCents, date: deposit.date });
+  }
+
+  return {
+    id: raw.id,
+    name: raw.name.trim().slice(0, MAX_GOAL_NAME_LENGTH),
+    targetCents: raw.targetCents,
+    targetDate: raw.targetDate,
+    deposits,
+    createdAt: raw.createdAt,
+  };
+}
+
+// ---------- 3.2 Monthly budget per category ----------
+// Budgets are one object: category name -> monthly limit in cents.
+// { Food: 20000, Fun: 5000 } means "$200 a month for Food, $50 for Fun".
+// A category that isn't in the object simply has no budget.
+// The same limits apply to every month (we don't keep a history of changes).
+
+// Returns a CLEAN budgets object from anything (storage or a backup file):
+// only real expense categories, only whole cents from 1 to $1,000,000.
+function cleanBudgets(raw) {
+  const budgets = {};
+  const isObject = typeof raw === 'object' && raw !== null && !Array.isArray(raw);
+  if (!isObject) return budgets;
+  for (const category of EXPENSE_CATEGORIES) {
+    const cents = raw[category];
+    if (Number.isInteger(cents) && cents > 0 && cents <= MAX_AMOUNT_CENTS) budgets[category] = cents;
+  }
+  return budgets;
+}
+
+// Returns a NEW budgets object with one category set (or removed when cents is null).
+function setBudget(budgets, category, cents) {
+  const copy = { ...budgets };
+  if (cents === null) delete copy[category];
+  else copy[category] = cents;
+  return copy;
+}
+
+// One row per category that has a budget, in the same order as the buttons:
+// [{ category, limitCents, spentCents, leftCents, percent, isOver, rolledOverCents }]
+// rolledOver (task 3.5) says how much of each limit came from last month.
+// leftCents can go below zero (spent more than planned); the UI words it calmly.
+// percent is how full the bar is: 0 to 100, rounded down, never more than 100.
+function budgetRows(monthEntries, limits, rolledOver = {}) {
+  const spent = {};
+  for (const entry of monthEntries) {
+    if (entry.type === 'expense') spent[entry.category] = (spent[entry.category] || 0) + entry.amountCents;
+  }
+  const rows = [];
+  for (const category of EXPENSE_CATEGORIES) {
+    const limitCents = limits[category];
+    if (!limitCents) continue; // no budget for this category
+    const spentCents = spent[category] || 0;
+    rows.push({
+      category,
+      limitCents,
+      spentCents,
+      leftCents: limitCents - spentCents,
+      percent: goalPercent(spentCents, limitCents), // same "round down, cap at 100" rule as goals
+      isOver: spentCents > limitCents,
+      rolledOverCents: rolledOver[category] || 0,
+    });
+  }
+  return rows;
+}
+
+// A calm sentence for one budget row. Facts only, no "warning" or "too much".
+function budgetStatusText(row) {
+  if (row.spentCents === 0) return 'Nothing spent yet, ' + formatCentsShort(row.limitCents) + ' to use';
+  if (row.leftCents > 0) return formatCentsShort(row.leftCents) + ' left of ' + formatCentsShort(row.limitCents);
+  if (row.leftCents === 0) return 'All ' + formatCentsShort(row.limitCents) + ' used, right on plan';
+  return formatCentsShort(-row.leftCents) + ' more than planned. A plan is a guide, not a test.';
+}
+
+// Import rule for budgets: like the wage, what's here wins. A category from the
+// file is only used if this browser has no budget for it yet.
+function mergeBudgets(currentBudgets, importedBudgets) {
+  const budgets = { ...currentBudgets };
+  let restoredCount = 0;
+  for (const category of Object.keys(importedBudgets)) {
+    if (budgets[category] === undefined) {
+      budgets[category] = importedBudgets[category];
+      restoredCount += 1;
+    }
+  }
+  return { budgets, restoredCount };
+}
+
+// ---------- 3.3 Safe to spend ----------
+// safe to spend per day = (left this month - set aside for goals - bills still to pay)
+//                         / days left in the month (today included)
+
+// Number of days in a month: daysInMonth("2028-02") -> 29.
+// Day 0 of the NEXT month is the last day of this one (the same overflow trick
+// as addDays). monthIndex is 0-based, so "month" (1-based) is already "next".
+function daysInMonth(key) {
+  const year = Number(key.slice(0, 4));
+  const month = Number(key.slice(5, 7));
+  return new Date(year, month, 0).getDate();
+}
+
+// Days left in the month, TODAY INCLUDED: on Nov 5 that's 26, on Nov 30 it's 1.
+// Never 0, so we can always divide by it.
+function daysLeftInMonth(todayIsoDate) {
+  const day = Number(todayIsoDate.slice(8, 10));
+  return daysInMonth(monthKey(todayIsoDate)) - day + 1;
+}
+
+// How many months from one month key to another: "2026-11" to "2027-03" is 4.
+function monthsBetween(fromKey, toKey) {
+  const years = Number(toKey.slice(0, 4)) - Number(fromKey.slice(0, 4));
+  const months = Number(toKey.slice(5, 7)) - Number(fromKey.slice(5, 7));
+  return years * 12 + months;
+}
+
+// Money added to a goal during one month ("2026-11").
+function goalAddedInMonth(goal, key) {
+  let total = 0;
+  for (const deposit of goal.deposits) {
+    if (monthKey(deposit.date) === key) total += deposit.amountCents;
+  }
+  return total;
+}
+
+// What a goal with a date needs this month to be reached on time: what was
+// still missing at the START of the month, shared equally over the months left
+// (this month and the target month both count). Rounded UP to the next cent,
+// so the shares add up to at least the target. Using the start of the month
+// keeps the plan steady while you add money during the month.
+// No date, date passed, or already reached: nothing is planned (0).
+function goalMonthlyPlanCents(goal, key) {
+  if (goal.targetDate === null) return 0;
+  const targetKey = monthKey(goal.targetDate);
+  if (targetKey < key) return 0; // the date has passed: no pressure, the UI says so calmly
+
+  let savedBefore = 0;
+  for (const deposit of goal.deposits) {
+    if (monthKey(deposit.date) < key) savedBefore += deposit.amountCents;
+  }
+  const missingCents = goal.targetCents - savedBefore;
+  if (missingCents <= 0) return 0;
+  return Math.ceil(missingCents / (monthsBetween(key, targetKey) + 1));
+}
+
+// Money for goals that can't be spent this month: for each goal, the plan or
+// what you already added, whichever is bigger. Added money is gone from your
+// pocket; the rest of the plan is still to be added. Example: plan $50, added
+// $20 -> $50 set aside ($20 moved + $30 still to move). Added $80 -> $80.
+function goalsSetAsideCents(goals, key) {
+  let total = 0;
+  for (const goal of goals) {
+    total += Math.max(goalMonthlyPlanCents(goal, key), goalAddedInMonth(goal, key));
+  }
+  return total;
+}
+
+// "Remaining bills": the app has no bills list, so we use the Bills budget.
+// The part of it not spent yet is money already promised to bills.
+// No Bills budget, or Bills already spent past it: 0.
+function billsStillToPayCents(monthEntries, limits) {
+  const limitCents = limits.Bills || 0;
+  let spentCents = 0;
+  for (const entry of monthEntries) {
+    if (entry.type === 'expense' && entry.category === 'Bills') spentCents += entry.amountCents;
+  }
+  return Math.max(0, limitCents - spentCents);
+}
+
+// All the numbers behind "safe to spend", for TODAY's month.
+// perDayCents is rounded DOWN to a whole cent: $100 over 3 days is $33.33 a
+// day, never $33.34 (rounding up would promise 1 cent that isn't there).
+// When nothing is available, perDayCents is 0, never negative.
+function safeToSpend(monthEntries, goals, limits, todayIsoDate) {
+  const key = monthKey(todayIsoDate);
+  const totals = monthTotals(monthEntries);
+  const goalsCents = goalsSetAsideCents(goals, key);
+  const billsCents = billsStillToPayCents(monthEntries, limits);
+  const availableCents = totals.leftCents - goalsCents - billsCents;
+  const daysLeft = daysLeftInMonth(todayIsoDate);
+  return {
+    inCents: totals.inCents,
+    leftCents: totals.leftCents,
+    goalsCents,
+    billsCents,
+    availableCents,
+    daysLeft,
+    perDayCents: availableCents > 0 ? Math.floor(availableCents / daysLeft) : 0,
+  };
+}
+
+// The calm sentence under the big number.
+function safeToSpendDetail(safe) {
+  if (safe.inCents === 0) return 'Add your money in (job pay, gifts) to see what\'s safe to spend.';
+  if (safe.availableCents <= 0) {
+    if (safe.goalsCents + safe.billsCents > 0 && safe.leftCents > 0) {
+      return 'Nothing extra for now: what\'s left is already set aside for your goals and bills. Your plans come first, and that\'s a good thing.';
+    }
+    return 'Nothing extra to spend for now. New money in will show up here.';
+  }
+
+  const when = safe.daysLeft === 1 ? 'for today, the last day of the month' : 'for the next ' + safe.daysLeft + ' days';
+  const minus = [];
+  if (safe.goalsCents > 0) minus.push(formatCents(safe.goalsCents) + ' for goals');
+  if (safe.billsCents > 0) minus.push(formatCents(safe.billsCents) + ' for bills');
+  const breakdown = minus.length === 0 ? '' : ' (' + formatCents(safe.leftCents) + ' left, minus ' + minus.join(' and ') + ')';
+  return formatCents(safe.availableCents) + ' ' + when + breakdown + '.';
+}
+
+// The short line under a goal about this month: "This month's plan: $50.00 ($20.00 added)".
+// Empty text when the goal has no date or is reached.
+function goalPlanText(goal, key) {
+  if (goal.targetDate === null || goalSavedCents(goal) >= goal.targetCents) return '';
+  if (monthKey(goal.targetDate) < key) return 'The date has passed. No rush: add money whenever you can.';
+  const planCents = goalMonthlyPlanCents(goal, key);
+  const addedCents = goalAddedInMonth(goal, key);
+  return 'This month\'s plan: ' + formatCents(planCents) + (addedCents > 0 ? ' (' + formatCents(addedCents) + ' added)' : '');
+}
+
+// ---------- 3.4 Budget styles ----------
+// Settings are one small object. Task 3.4 adds the style; 3.5 adds rollover.
+
+const BUDGET_STYLES = ['simple', '503020'];
+const DEFAULT_SETTINGS = { budgetStyle: 'simple', rollover: false };
+
+// Returns CLEAN settings from anything: a missing or strange value falls back
+// to its default, so the app always has every setting.
+function cleanSettings(raw) {
+  const isObject = typeof raw === 'object' && raw !== null && !Array.isArray(raw);
+  const data = isObject ? raw : {};
+  return {
+    budgetStyle: BUDGET_STYLES.includes(data.budgetStyle) ? data.budgetStyle : DEFAULT_SETTINGS.budgetStyle,
+    rollover: data.rollover === true, // task 3.5: only a real true turns it on
+  };
+}
+
+// True if two settings objects have the same value for every setting.
+function sameSettings(a, b) {
+  return Object.keys(DEFAULT_SETTINGS).every((name) => a[name] === b[name]);
+}
+
+// Import rule for settings: there's always SOME value here (the defaults), so
+// "what's here wins" means: use the file's settings only if the ones here were
+// never changed from the defaults. importedSettings is null for files without settings.
+function mergeSettings(currentSettings, importedSettings) {
+  if (importedSettings === null || !sameSettings(currentSettings, DEFAULT_SETTINGS)) {
+    return { settings: currentSettings, restored: false };
+  }
+  return { settings: importedSettings, restored: !sameSettings(importedSettings, DEFAULT_SETTINGS) };
+}
+
+// Which expense categories count as needs and wants. Food is a need: the app
+// can't tell groceries from takeout, and eating isn't optional.
+// "Savings" isn't a category: it's the money you added to goals that month.
+const NEEDS_CATEGORIES = ['Food', 'Transport', 'School', 'Bills'];
+const WANTS_CATEGORIES = ['Fun', 'Other'];
+
+// 50% / 30% / 20% of money in, in whole cents. Needs and wants are rounded
+// down, and savings gets whatever is left, so the three always add up to
+// exactly the money in (no cent lost or invented).
+function splitTargets(incomeCents) {
+  const needsCents = Math.floor((incomeCents * 50) / 100);
+  const wantsCents = Math.floor((incomeCents * 30) / 100);
+  return { needsCents, wantsCents, savingsCents: incomeCents - needsCents - wantsCents };
+}
+
+// The 50/30/20 picture for one month: for each group, the guide amount
+// (from money in) and what really happened.
+// Returns { inCents, rows: [{ group, guidePercent, targetCents, actualCents, percent }] }
+// percent = how full the bar is (actual vs guide, 0 to 100).
+function fiftyThirtyTwenty(monthEntries, goals, key) {
+  const totals = monthTotals(monthEntries);
+  const targets = splitTargets(totals.inCents);
+  let needsCents = 0;
+  let wantsCents = 0;
+  for (const entry of monthEntries) {
+    if (entry.type !== 'expense') continue;
+    if (NEEDS_CATEGORIES.includes(entry.category)) needsCents += entry.amountCents;
+    else wantsCents += entry.amountCents; // Fun, Other (and anything unknown)
+  }
+  let savingsCents = 0;
+  for (const goal of goals) savingsCents += goalAddedInMonth(goal, key);
+
+  const row = (group, guidePercent, targetCents, actualCents) => ({
+    group,
+    guidePercent,
+    targetCents,
+    actualCents,
+    percent: targetCents > 0 ? goalPercent(actualCents, targetCents) : 0,
+  });
+  return {
+    inCents: totals.inCents,
+    rows: [
+      row('Needs', 50, targets.needsCents, needsCents),
+      row('Wants', 30, targets.wantsCents, wantsCents),
+      row('Savings', 20, targets.savingsCents, savingsCents),
+    ],
+  };
+}
+
+// A calm sentence for one 50/30/20 row. Above the guide is said plainly for
+// needs and wants, and cheered for savings (saving more is good news).
+function splitRowText(row) {
+  const actual = formatCentsShort(row.actualCents);
+  const target = formatCentsShort(row.targetCents);
+  if (row.actualCents <= row.targetCents) return actual + ' of ' + target;
+  if (row.group === 'Savings') return actual + ', above the ' + target + ' guide. Nice!';
+  return actual + ', a bit above the ' + target + ' guide';
+}
+
+// ---------- 3.5 Rollover ----------
+// With rollover on, what you didn't spend of a budget last month is added to
+// the same budget this month. Example: Fun is $50 a month, you spent $30 in
+// October, so November's Fun budget is $50 + $20 = $70.
+// Rules (the simplest ones, see LEARNING.md "Decisions"):
+// - Only LAST month counts (it doesn't pile up over many months).
+// - Spending more than planned never makes next month smaller (no negative rollover).
+// - If last month has no entries at all, nothing rolls over: you probably
+//   weren't using the app yet, and a whole "free" budget would be misleading.
+
+// Returns { limits, rolledOver }: the limits to use for a month, and how much
+// of each came from last month (only categories where something rolled over).
+function effectiveLimits(budgets, previousMonthEntries, rolloverOn) {
+  const limits = { ...budgets };
+  const rolledOver = {};
+  if (!rolloverOn || previousMonthEntries.length === 0) return { limits, rolledOver };
+
+  const spentBefore = {};
+  for (const entry of previousMonthEntries) {
+    if (entry.type === 'expense') spentBefore[entry.category] = (spentBefore[entry.category] || 0) + entry.amountCents;
+  }
+  for (const category of Object.keys(budgets)) {
+    const unspentCents = Math.max(0, budgets[category] - (spentBefore[category] || 0));
+    if (unspentCents > 0) {
+      limits[category] = budgets[category] + unspentCents;
+      rolledOver[category] = unspentCents;
+    }
+  }
+  return { limits, rolledOver };
+}
+
+// "Includes $20 not spent in October", or '' when nothing rolled over.
+function rolloverText(rolledOverCents, previousKey) {
+  if (!rolledOverCents) return '';
+  const monthName = MONTH_NAMES[Number(previousKey.slice(5, 7)) - 1];
+  return 'Includes ' + formatCentsShort(rolledOverCents) + ' not spent in ' + monthName;
 }
 
 // ---------- Sharing with Node ----------
@@ -566,6 +1048,42 @@ if (typeof module !== 'undefined' && module.exports) {
     cleanImportedEntry,
     parseBackup,
     mergeEntries,
+    mergeById,
     importSummary,
+    MAX_GOAL_NAME_LENGTH,
+    formatLongDate,
+    goalSavedCents,
+    goalPercent,
+    validateGoalInput,
+    addDeposit,
+    deleteGoal,
+    cleanGoal,
+    cleanBudgets,
+    setBudget,
+    budgetRows,
+    budgetStatusText,
+    mergeBudgets,
+    daysInMonth,
+    daysLeftInMonth,
+    monthsBetween,
+    goalAddedInMonth,
+    goalMonthlyPlanCents,
+    goalsSetAsideCents,
+    billsStillToPayCents,
+    safeToSpend,
+    safeToSpendDetail,
+    goalPlanText,
+    BUDGET_STYLES,
+    DEFAULT_SETTINGS,
+    cleanSettings,
+    sameSettings,
+    mergeSettings,
+    NEEDS_CATEGORIES,
+    WANTS_CATEGORIES,
+    splitTargets,
+    fiftyThirtyTwenty,
+    splitRowText,
+    effectiveLimits,
+    rolloverText,
   };
 }
