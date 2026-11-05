@@ -1,0 +1,51 @@
+/* Loads Tailwind. Every class like "px-4" or "rounded-2xl" comes from here. */
+@import "tailwindcss";
+
+/* Our calm palette, in ONE place. Each colour is a CSS variable that changes
+   in dark mode (below). The @theme block turns them into Tailwind classes:
+   --color-page becomes bg-page / text-page / border-page, and so on.
+   Keep --page and --accent in sync with app/manifest.ts and scripts/make-icons.mjs. */
+:root {
+  color-scheme: light dark; /* the browser draws form fields and scrollbars to match */
+  --page: #f7f6f3; /* warm off-white background */
+  --card: #ffffff;
+  --ink: #1f2a26; /* main text: very dark green-grey, softer than pure black */
+  --muted: #5e6b65; /* secondary text */
+  --line: #e3e1da; /* borders */
+  --accent: #4f7d6b; /* sage green: buttons and links */
+  --accent-ink: #ffffff; /* text ON an accent button */
+  --accent-soft: #e5eee9; /* light tint for highlights */
+}
+
+/* The phone or computer is set to dark mode: swap the colours. */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --page: #121614;
+    --card: #1a201d;
+    --ink: #e8ece9;
+    --muted: #9aa6a0;
+    --line: #2b3430;
+    --accent: #8cc0a9;
+    --accent-ink: #0f1412;
+    --accent-soft: #1f2c27;
+  }
+}
+
+/* "inline" makes Tailwind use var(--page) directly, so the dark-mode swap above works. */
+@theme inline {
+  --color-page: var(--page);
+  --color-card: var(--card);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-accent: var(--accent);
+  --color-accent-ink: var(--accent-ink);
+  --color-accent-soft: var(--accent-soft);
+}
+
+body {
+  /* System fonts: fast (nothing to download, also works offline) and look native. */
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  /* No grey flash when tapping buttons on phones. */
+  -webkit-tap-highlight-color: transparent;
+}

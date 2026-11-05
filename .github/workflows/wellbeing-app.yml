@@ -1,0 +1,38 @@
+# Checks wellbeing-app on GitHub's computers on every push and pull request,
+# but only when something inside apps/wellbeing-app (or this file) changed.
+# If lint, tests or the build fail, GitHub shows a red X on the commit.
+name: wellbeing-app
+
+on:
+  push:
+    paths:
+      - 'apps/wellbeing-app/**'
+      - '.github/workflows/wellbeing-app.yml'
+  pull_request:
+    paths:
+      - 'apps/wellbeing-app/**'
+      - '.github/workflows/wellbeing-app.yml'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        # Every "run:" step below starts inside the app folder.
+        working-directory: apps/wellbeing-app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/wellbeing-app/package-lock.json
+      # npm ci installs exactly what package-lock.json says (faster and stricter than npm install).
+      - run: npm ci
+      # ESLint: common mistakes in React/TypeScript code.
+      - run: npm run lint
+      # Vitest: the logic tests in lib/ (auth, profile cache, service worker, manifest).
+      - run: npm test
+      # The build also type-checks every file. No Supabase keys here, so it
+      # builds in demo mode, which is exactly what we want to check.
+      - run: npm run build

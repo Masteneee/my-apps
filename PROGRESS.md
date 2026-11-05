@@ -26,7 +26,7 @@ Done: shorts-blocker (3/3), wondered-site (4/4), media-log Stages 1 to 5 (runs i
 - [x] Stage 7: Ship + portfolio
 
 ## 4. wellbeing-app
-- [ ] Stage 1: Skeleton + accounts + PWA
+- [x] Stage 1: Skeleton + accounts + PWA
 - [ ] Stage 2: Daily check-in
 - [ ] Stage 3: Streaks + calendar
 - [ ] Stage 4: Friends + shared streaks
