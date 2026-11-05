@@ -1,0 +1,18 @@
+{
+  "manifest_version": 3,
+  "name": "Short-Form Blocker",
+  "version": "0.1.0",
+  "description": "Hides YouTube Shorts and redirects Shorts links to the normal video player.",
+  "action": {
+    "default_title": "Short-Form Blocker",
+    "default_popup": "popup/popup.html"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://www.youtube.com/*", "https://m.youtube.com/*"],
+      "js": ["src/url-logic.js", "src/youtube.js"],
+      "css": ["src/youtube.css"],
+      "run_at": "document_start"
+    }
+  ]
+}

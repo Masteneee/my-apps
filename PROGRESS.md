@@ -6,7 +6,7 @@ Legend: `[ ]` to do, `[x]` done, `[?]` needs my choice, `[!]` failed (reason not
 Not started.
 
 ## 1. shorts-blocker (Chrome extension)
-- [ ] Stage 1: Skeleton + YouTube
+- [x] Stage 1: Skeleton + YouTube
 - [ ] Stage 2: Other sites + settings
 - [ ] Stage 3: Polish + tests
 
