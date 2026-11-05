@@ -1,0 +1,48 @@
+---
+// "Suggest a question" page. The form sends straight to Formspree (a free form service),
+// which emails the suggestion to you, so this static site needs no backend.
+import Base from '../layouts/Base.astro';
+import { formspreeAction } from '../lib/formspree';
+
+// PUBLIC_ variables are read at build time from .env.local (or the host's settings).
+// The "PUBLIC_" prefix is required: Astro hides other variables from pages on purpose.
+const action = formspreeAction(import.meta.env.PUBLIC_FORMSPREE_ID);
+
+const inputClass =
+  'mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-base dark:border-slate-600 dark:bg-slate-900';
+---
+<Base title="Suggest a question">
+  <h1 class="mb-4 text-4xl font-extrabold tracking-tight sm:text-5xl">Suggest a question</h1>
+  <p class="mb-8 text-lg text-slate-600 dark:text-slate-400">
+    Ever wondered about something? Send it in and it might become the next answer (or video).
+  </p>
+
+  {action ? (
+    <form action={action} method="POST" class="space-y-5">
+      <div>
+        <label for="question" class="font-semibold">Your question</label>
+        <textarea id="question" name="question" required rows="3" maxlength="500" class={inputClass}
+          placeholder="Have you ever wondered why..."></textarea>
+      </div>
+      <div>
+        <label for="name" class="font-semibold">Your name <span class="font-normal text-slate-500">(optional)</span></label>
+        <input id="name" name="name" type="text" maxlength="100" class={inputClass} />
+      </div>
+      <div>
+        <label for="email" class="font-semibold">Email <span class="font-normal text-slate-500">(optional, only if you'd like a reply)</span></label>
+        <!-- Formspree uses a field called "email" as the reply-to address. -->
+        <input id="email" name="email" type="email" maxlength="200" class={inputClass} />
+      </div>
+      <!-- Honeypot: hidden from people, but spam bots fill in every field.
+           Formspree silently drops any submission where _gotcha has a value. -->
+      <input type="text" name="_gotcha" tabindex="-1" autocomplete="off" class="hidden" aria-hidden="true" />
+      <button type="submit" class="rounded-full bg-indigo-600 px-5 py-2 font-semibold text-white hover:bg-indigo-500 dark:bg-indigo-400 dark:text-slate-950 dark:hover:bg-indigo-300">
+        Send my question
+      </button>
+    </form>
+  ) : (
+    <p class="rounded-xl bg-slate-100 p-5 text-lg dark:bg-slate-900">
+      The suggestion box isn't open quite yet. Check back soon, your question will be very welcome!
+    </p>
+  )}
+</Base>

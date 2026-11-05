@@ -36,6 +36,7 @@ const { title } = Astro.props;
         <a href="/" class="text-lg font-extrabold tracking-tight">Have You Ever Wondered?</a>
         <div class="flex flex-wrap items-center gap-2">
           <a href="/search/" class="rounded-full border border-slate-300 px-3 py-1 text-sm hover:bg-slate-100 dark:border-slate-600 dark:hover:bg-slate-800">Search</a>
+          <a href="/suggest/" class="rounded-full border border-slate-300 px-3 py-1 text-sm hover:bg-slate-100 dark:border-slate-600 dark:hover:bg-slate-800">Suggest</a>
           <RandomButton />
           <ThemeToggle />
         </div>
@@ -46,6 +47,7 @@ const { title } = Astro.props;
     </main>
     <footer class="mx-auto max-w-3xl px-4 py-8 text-sm text-slate-500 dark:text-slate-400">
       Short, sourced answers to everyday questions.
+      <a href="/suggest/" class="underline hover:text-slate-700 dark:hover:text-slate-200">Suggest a question</a>.
     </footer>
   </body>
 </html>

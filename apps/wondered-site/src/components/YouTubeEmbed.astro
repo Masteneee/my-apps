@@ -1,0 +1,57 @@
+---
+// A YouTube video that only loads when the visitor clicks "Play".
+// A real YouTube iframe downloads around 1 MB of scripts, so we show a plain button
+// first and swap in the iframe on click. If there's no valid ID, this renders nothing.
+import { isValidYouTubeId, youTubeEmbedUrl, youTubeWatchUrl } from '../lib/youtube';
+
+interface Props {
+  id?: string;
+  title: string; // used for the iframe's accessible name (screen readers read it)
+}
+const { id, title } = Astro.props;
+---
+{isValidYouTubeId(id) && (
+  <youtube-embed data-src={youTubeEmbedUrl(id)} data-title={`Video: ${title}`} class="mt-8 block">
+    <div class="aspect-video w-full overflow-hidden rounded-xl bg-slate-900">
+      <button
+        type="button"
+        class="flex h-full w-full flex-col items-center justify-center gap-3 text-white hover:bg-slate-800"
+      >
+        <!-- A simple play triangle drawn with SVG, so no image has to download. -->
+        <svg viewBox="0 0 68 48" class="h-12 w-16" aria-hidden="true">
+          <rect width="68" height="48" rx="12" fill="#dc2626" />
+          <path d="M27 14 L47 24 L27 34 Z" fill="white" />
+        </svg>
+        <span class="text-lg font-semibold">Play the video</span>
+        <span class="text-xs text-slate-300">Loads from YouTube (privacy-enhanced mode) when you click.</span>
+      </button>
+    </div>
+    <a href={youTubeWatchUrl(id)} class="mt-2 inline-block text-sm text-indigo-700 hover:underline dark:text-indigo-300" rel="noopener">
+      Watch on YouTube instead
+    </a>
+  </youtube-embed>
+)}
+
+<script>
+  // Same custom element pattern as the Random button: this runs for each <youtube-embed>.
+  class YouTubeEmbed extends HTMLElement {
+    connectedCallback() {
+      const button = this.querySelector('button');
+      button?.addEventListener(
+        'click',
+        () => {
+          const iframe = document.createElement('iframe');
+          iframe.src = this.dataset.src ?? '';
+          iframe.title = this.dataset.title ?? 'YouTube video';
+          iframe.className = 'h-full w-full';
+          iframe.allow = 'autoplay; encrypted-media; picture-in-picture; fullscreen';
+          iframe.allowFullscreen = true;
+          // Swap the button for the iframe inside the same 16:9 box.
+          button.replaceWith(iframe);
+        },
+        { once: true }, // one click is all we need
+      );
+    }
+  }
+  customElements.define('youtube-embed', YouTubeEmbed);
+</script>

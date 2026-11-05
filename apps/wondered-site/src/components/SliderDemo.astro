@@ -1,0 +1,60 @@
+---
+// Reusable interactive slider for MDX pages: <SliderDemo demo="rayleigh" />
+// The science lives in src/lib/demos.ts; this file only draws the slider and updates it.
+import { DEMOS, type DemoName } from '../lib/demos';
+
+interface Props {
+  demo: DemoName;
+}
+const { demo } = Astro.props;
+const config = DEMOS[demo];
+// Work out the starting result at build time, so the page already shows sensible
+// text before JavaScript runs (and even if it never does).
+const first = config.compute(config.start);
+const inputId = `slider-${demo}`;
+---
+<slider-demo data-demo={demo} class="my-8 block rounded-xl border border-slate-200 p-5 dark:border-slate-700">
+  <label for={inputId} class="block text-base font-semibold">
+    {config.label}: <output data-value>{config.start}</output> {config.unit}
+  </label>
+  <input
+    id={inputId}
+    type="range"
+    min={config.min}
+    max={config.max}
+    step={config.step}
+    value={config.start}
+    class="mt-3 w-full accent-indigo-600"
+  />
+  <div class="mt-4 h-4 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800">
+    <div data-bar class="h-full rounded-full" style={`width: ${first.barFraction * 100}%; background: ${first.barColor}`}></div>
+  </div>
+  <!-- aria-live: screen readers announce the new sentence when the slider moves. -->
+  <p data-text aria-live="polite" class="mt-3 text-base">{first.text}</p>
+</slider-demo>
+
+<script>
+  import { DEMOS, type DemoName } from '../lib/demos';
+
+  class SliderDemo extends HTMLElement {
+    connectedCallback() {
+      const config = DEMOS[this.dataset.demo as DemoName];
+      const input = this.querySelector('input');
+      const valueOut = this.querySelector('[data-value]');
+      const bar = this.querySelector<HTMLElement>('[data-bar]');
+      const text = this.querySelector('[data-text]');
+      if (!config || !input || !valueOut || !bar || !text) return;
+
+      // "input" fires continuously while dragging ("change" would only fire on release).
+      input.addEventListener('input', () => {
+        const value = Number(input.value); // slider values are strings, so convert
+        const result = config.compute(value);
+        valueOut.textContent = String(value);
+        bar.style.width = `${result.barFraction * 100}%`;
+        bar.style.background = result.barColor;
+        text.textContent = result.text;
+      });
+    }
+  }
+  customElements.define('slider-demo', SliderDemo);
+</script>

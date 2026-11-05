@@ -11,3 +11,4 @@ Things only I (Amasten) can do: accounts, API keys, deploying, and choices the p
 ## Added during the build
 - [ ] **shorts-blocker:** load it in Chrome (`chrome://extensions` > Developer mode > Load unpacked > `apps/shorts-blocker`) and run the README's "Test it by hand" steps. Selectors for Instagram/Facebook/Snapchat were never tested on the live sites.
 - [ ] **wondered-site:** click each source link in the 3 sample questions once to confirm it opens (the build couldn't reach the web).
+- [ ] **wondered-site:** create a free Formspree form, copy `.env.example` to `.env.local` in `apps/wondered-site`, and paste the form ID into `PUBLIC_FORMSPREE_ID` (also on the host when deploying). Until then the suggest page shows "coming soon".

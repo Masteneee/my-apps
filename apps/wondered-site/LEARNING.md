@@ -208,3 +208,104 @@ run `npm run build` and `npm run preview`, and check that each physics page now 
 Answers
 1. Pagefind builds the search index from `dist/` as the last step of `npm run build`; the dev server never runs Pagefind, so `/pagefind/` doesn't exist there.
 2. So tests can pass a fake random function with a known result and check the exact answer, while the browser passes the real `Math.random`.
+
+## Stage 3: Video + interactivity (2026-11-04)
+
+### What we built
+- A YouTube embed that shows a lightweight "Play the video" button and only loads the real player when clicked.
+  It uses `youtube_id` from the frontmatter and renders nothing when it's empty.
+- A reusable `<SliderDemo>` component. The first demo, on "Why is the sky blue?", lets you drag the wavelength
+  and shows how many times more it scatters than red light (Rayleigh scattering, 1 / wavelength⁴).
+- A `/suggest/` page with a form that sends questions to Formspree, plus a friendly message when it isn't set up.
+
+### New concepts
+
+**Lazy loading ("facade").** A YouTube iframe pulls in roughly a megabyte of scripts, even if nobody presses play.
+So we show a cheap stand-in (a button drawn with HTML and a small SVG) and only create the `<iframe>` when it's
+clicked. The page stays fast, and YouTube isn't contacted at all for visitors who don't watch.
+
+**youtube-nocookie.com.** This is YouTube's own "privacy-enhanced mode" domain. It plays the same videos, but
+doesn't set tracking cookies until the visitor actually plays something.
+
+**MDX components.** MDX is Markdown that can contain components like `<SliderDemo demo="rayleigh" />`. Normally
+each file would need an `import` line, but we pass `components={{ SliderDemo }}` to `<Content />` in the
+question template, so every question can use it directly.
+
+**Separating data from display.** `SliderDemo.astro` knows nothing about physics: it draws a slider, a bar and a
+sentence. Each demo in `src/lib/demos.ts` is a small config object plus one pure `compute` function. That's what
+makes the component reusable, and it lets Vitest check the science without a browser.
+
+**The `input` event.** A range slider fires `input` continuously while you drag, and `change` only when you let
+go. We listen to `input` so the bar moves with your finger. Slider values arrive as text, so `Number(...)` turns
+them into numbers before doing maths.
+
+**Environment variables.** Settings that change between computers (or that you don't want in git) go in
+`.env.local`, which is ignored by git. `.env.example` is the committed "blank form" showing which ones exist.
+Astro only exposes variables starting with `PUBLIC_` to pages, as a safety net, and reads them at build time.
+A Formspree form ID isn't a secret (it's visible in the page's HTML anyway), but keeping it in an env var means
+you can change it without editing code.
+
+**Honeypot field.** The form has a hidden `_gotcha` input. People never see it, but spam bots fill every field,
+and Formspree throws away any submission where it isn't empty.
+
+**`.refine` in a Zod schema.** `refine` adds your own rule to a field. Here `youtube_id` must be `""` or pass
+`isValidYouTubeId`, so pasting a whole URL by mistake stops the build with a readable message.
+
+### No new dependencies
+Formspree is a website you post to, not a package. Everything else is plain Astro and browser code.
+
+### Files and what each one does
+- `src/lib/youtube.ts` + `youtube.test.ts` checks an ID is 11 valid characters, builds embed and watch URLs.
+- `src/lib/demos.ts` + `demos.test.ts` the `DEMOS` list, `rayleighRelativeToRed` and `colourName`.
+- `src/lib/formspree.ts` + `formspree.test.ts` turns the form ID into the URL, or `null` if missing/invalid.
+- `src/components/YouTubeEmbed.astro` click-to-load video.
+- `src/components/SliderDemo.astro` reusable slider, works for any entry in `DEMOS`.
+- `src/pages/suggest.astro` the suggest form (or the fallback message).
+- `src/env.d.ts` tells TypeScript that `PUBLIC_FORMSPREE_ID` exists.
+- `.env.example` the variables to copy into `.env.local`.
+- `src/pages/questions/[slug].astro` shows the video and makes `SliderDemo` available to MDX.
+- `src/layouts/Base.astro` "Suggest" link in the header and footer.
+- `src/content.config.ts` `youtube_id` is now validated.
+- `src/content/questions/why-is-the-sky-blue.mdx` uses the slider.
+
+### Most important lines
+```ts
+return (RED_NM / wavelengthNm) ** 4;
+```
+Rayleigh scattering goes as 1 / λ⁴. Dividing red's 700 nm by the chosen wavelength and raising it to the 4th power
+gives "how many times more than red". At 450 nm that's about 5.9; at 350 nm (half of 700) it's exactly 2⁴ = 16.
+
+```ts
+button.replaceWith(iframe);
+```
+Until this line runs, no YouTube code is on the page. On click we build the iframe and put it exactly where the
+button was, inside the same 16:9 box.
+
+```astro
+const action = formspreeAction(import.meta.env.PUBLIC_FORMSPREE_ID);
+```
+Reads the env var at build time. If it gives a URL, the form is drawn with `action={action}`; if it's `null`,
+the friendly fallback is drawn instead, so visitors never hit a broken form.
+
+### Decisions
+- No video thumbnail: showing YouTube's thumbnail image would contact YouTube before the click. A plain button
+  keeps the "nothing loads until you click" promise. (Easy to add later if you want it.)
+- The video sits right under the short answer, before the long explanation.
+- The form uses a normal HTML POST, so after sending, Formspree shows its own thank-you page. Simplest option,
+  and it works without JavaScript.
+- Form fields: question (required), name and email (optional).
+- Colour bands for the slider use common textbook borders (violet below 450 nm, blue to 495, green to 570,
+  yellow to 590, orange to 620, red above). Real colour borders are fuzzy.
+
+### Practice exercise
+Add a second demo called `density` to `DEMOS` in `src/lib/demos.ts`: a slider for an object's density
+(0.5 to 1.5 g/cm³) whose sentence says "floats" or "sinks" compared to water (1.00 g/cm³). Add a test for it, then put `<SliderDemo demo="density" />` in
+`why-does-ice-float.mdx` and check it with `npm run dev`.
+
+### Quiz
+1. Why does the page show a button first instead of the YouTube iframe right away?
+2. What happens on `/suggest/` if `PUBLIC_FORMSPREE_ID` isn't set, and why must the name start with `PUBLIC_`?
+
+Answers
+1. The iframe downloads a lot of YouTube code (and contacts YouTube) even if nobody watches; the button is almost free, and the iframe is created only on click.
+2. `formspreeAction` returns `null`, so the page shows the friendly "not open yet" message instead of the form. Astro only exposes variables starting with `PUBLIC_` to page code, so other names would come through as undefined.
