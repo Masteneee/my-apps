@@ -1,3 +1,5 @@
+import { existsSync } from "node:fs";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { loadServiceWorker, type StrategyRequest } from "./load-service-worker";
 
@@ -131,6 +133,19 @@ describe("app shell", () => {
   it("saves the daily check-in and the habits page in advance, so they open offline (Stage 2)", () => {
     expect(sw.APP_SHELL).toContain("/checkin");
     expect(sw.APP_SHELL).toContain("/habits");
+  });
+
+  it("saves the streaks and breathing pages in advance too (Stage 3)", () => {
+    expect(sw.APP_SHELL).toContain("/streaks");
+    expect(sw.APP_SHELL).toContain("/breathe");
+  });
+
+  it("only lists pages that really exist (a typo would make the whole install fail)", () => {
+    const pages = sw.APP_SHELL.filter((path) => !path.startsWith("/icons/") && !path.includes("."));
+    for (const path of pages) {
+      // "/" is app/page.tsx, "/streaks" is app/streaks/page.tsx.
+      expect(existsSync(join(__dirname, "..", "..", "app", path, "page.tsx")), path).toBe(true);
+    }
   });
 
   it("only lists pages and files the strategy would actually serve", () => {

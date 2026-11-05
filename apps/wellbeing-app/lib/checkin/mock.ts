@@ -14,8 +14,8 @@
 import type { KeyValueStorage } from "../auth/mock";
 import { isDateKey } from "./date";
 import { applyPatch } from "./merge";
-import type { Checkin, CheckinStore, Habit, HabitEntry } from "./types";
-import { validateCheckinPatch, validateEntryValue, validateNewHabit } from "./validation";
+import type { Checkin, CheckinDay, CheckinStore, Habit, HabitEntry } from "./types";
+import { validateCheckinPatch, validateDateRange, validateEntryValue, validateNewHabit } from "./validation";
 
 export const MOCK_CHECKIN_STORAGE_KEY = "wellbeing-app:mock-checkins";
 
@@ -69,6 +69,12 @@ export function createMockCheckinStore({
 
   function requireDate(date: string) {
     if (!isDateKey(date)) throw new Error("That day doesn't look right.");
+  }
+
+  function requireRange(from: string, to: string) {
+    const check = validateDateRange(from, to);
+    if (!check.ok) throw new Error(check.error);
+    return check.value;
   }
 
   function sameName(a: string, b: string) {
@@ -170,6 +176,24 @@ export function createMockCheckinStore({
       if (entry) db.habitEntries.push(entry);
       save(db);
       return entry;
+    },
+
+    // Stage 3: ranges of days (streaks and calendars).
+    async listCheckinDays(from, to) {
+      const userId = await requireUser();
+      const range = requireRange(from, to);
+      return load()
+        .checkins.filter((c) => c.user_id === userId && c.date >= range.from && c.date <= range.to)
+        .map((c): CheckinDay => ({ date: c.date, mood: c.mood })) // only what the calendar needs
+        .sort((a, b) => a.date.localeCompare(b.date));
+    },
+
+    async listHabitEntries(from, to) {
+      const userId = await requireUser();
+      const range = requireRange(from, to);
+      return load()
+        .habitEntries.filter((e) => e.user_id === userId && e.date >= range.from && e.date <= range.to)
+        .sort((a, b) => a.date.localeCompare(b.date) || a.habit_id.localeCompare(b.habit_id));
     },
 
     // localStorage is always there, so nothing ever waits to sync in demo mode.

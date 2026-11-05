@@ -11,7 +11,17 @@ import { createOfflineAwareStore } from "./offline";
 import { createSupabaseCheckinStore } from "./supabase";
 import type { CheckinStore } from "./types";
 
-export type { Checkin, CheckinFields, CheckinPatch, CheckinStore, Habit, HabitEntry, HabitType, NewHabit } from "./types";
+export type {
+  Checkin,
+  CheckinDay,
+  CheckinFields,
+  CheckinPatch,
+  CheckinStore,
+  Habit,
+  HabitEntry,
+  HabitType,
+  NewHabit,
+} from "./types";
 export { OfflineError } from "./types";
 
 let store: CheckinStore | null = null;

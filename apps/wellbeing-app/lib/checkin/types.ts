@@ -61,6 +61,13 @@ export type HabitEntry = {
   value: number; // checkbox: 1; number/minutes: the amount
 };
 
+/**
+ * One day with a check-in, for the mood calendar and the check-in streak
+ * (Stage 3). Only the day and the mood: loading a whole season of check-ins
+ * should never pull your journal and gratitude texts along with it.
+ */
+export type CheckinDay = { date: string; mood: number | null };
+
 export type StoreMode = "supabase" | "mock";
 
 /**
@@ -90,6 +97,13 @@ export interface CheckinStore {
   getHabitEntries(date: string): Promise<HabitEntry[]>;
   /** Saves one habit's value for a day. null (or 0) removes it = "not done". */
   saveHabitEntry(habit: Pick<Habit, "id" | "type">, date: string, value: number | null): Promise<HabitEntry | null>;
+
+  // Stage 3: ranges of days, for streaks and calendars. `from` and `to` are
+  // date keys and both are included. Results are oldest first.
+  /** The days you have a check-in, with just the mood (never the journal). */
+  listCheckinDays(from: string, to: string): Promise<CheckinDay[]>;
+  /** All your habit entries in that range, for every habit (archived ones too). */
+  listHabitEntries(from: string, to: string): Promise<HabitEntry[]>;
 
   /** How many changes are saved on this device, waiting for the internet. Always 0 in demo mode. */
   pendingSyncCount(): Promise<number>;

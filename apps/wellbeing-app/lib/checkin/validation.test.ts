@@ -6,6 +6,7 @@ import {
   cleanMoodTags,
   JOURNAL_MAX,
   validateCheckinPatch,
+  validateDateRange,
   validateEntryValue,
   validateNewHabit,
 } from "./validation";
@@ -151,5 +152,17 @@ describe("validateEntryValue", () => {
     expect(validateEntryValue({ type: "number" }, -1).ok).toBe(false);
     expect(validateEntryValue({ type: "number" }, 2.5).ok).toBe(false);
     expect(validateEntryValue({ type: "minutes" }, 1441).ok).toBe(false);
+  });
+});
+
+describe("validateDateRange (Stage 3)", () => {
+  it("accepts two real days in order (the same day twice is fine)", () => {
+    expect(validateDateRange("2026-11-01", "2026-11-30")).toEqual({ ok: true, value: { from: "2026-11-01", to: "2026-11-30" } });
+    expect(validateDateRange("2026-11-05", "2026-11-05").ok).toBe(true);
+  });
+
+  it("refuses broken keys and backwards ranges", () => {
+    expect(validateDateRange("2026-02-30", "2026-03-01").ok).toBe(false);
+    expect(validateDateRange("2026-11-30", "2026-11-01").ok).toBe(false);
   });
 });

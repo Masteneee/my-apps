@@ -261,3 +261,146 @@ or 5 if everything is answered). Write its tests in `steps.test.ts` first (nothi
 and screen time answered → 2; everything → 5), run `npm test` and watch them fail, then write the
 function. Finally use it in `CheckinFlow.tsx` as the starting value of `stepIndex`. Bonus question:
 should a fully answered check-in open on the "done" screen or on step 1? Why?
+
+## Stage 3: Streaks + calendar (2026-11-05)
+
+### What we built
+A `/streaks` page with your **check-in streak**, a **streak per habit** (current and best, missed
+days in the last 30) and a **calendar heatmap** of the last 12 weeks: one for your mood and one per
+habit, picked with a row of buttons. A **freeze** (❄) saves a streak when you miss a single day. The
+home page's Streaks card now shows real numbers. There's also a `/breathe` page with a circle that
+grows and shrinks for **4-7-8** and **box breathing**. Both pages open offline. All the counting is
+in three pure, tested files: `lib/streaks.ts`, `lib/calendar.ts` and `lib/breathing.ts`.
+
+### The streak rules (decided this stage)
+1. A streak is the number of **done** days in a row.
+2. **Today not done yet doesn't break anything**: you have until midnight (your phone's time).
+3. **Freeze:** if you miss **one** day between two done days, the missed day is "frozen" and the
+   streak goes on. The frozen day doesn't add to the count.
+4. **One freeze per 7 days:** after a freeze on day F, the next one works from day F + 7. Two missed
+   days in a row always end the streak.
+5. Freezes are **automatic and never stored**: they are worked out from your history each time.
+6. A habit with a daily goal (8 glasses) counts as done only when you reach the goal. For the
+   check-in streak, a day counts if you saved anything that day (an answer or a habit).
+
+Example (D = done, . = missed): `D D . D D D . D`. Day 3 is frozen. Day 7 is also a single miss,
+but only 4 days after the first freeze, so it ends the streak. Best = 5, current = 1.
+
+### New concepts
+
+**Counting days with date keys, not timestamps.** A streak asks "was yesterday done?", so we need to
+step from one day to the next. The trap is adding 24 hours: in Toronto, March 8 2026 lasts only 23
+hours and November 1 lasts 25, so "+24 h" can skip a day or land on the same day twice.
+Our days are date keys (`"2026-11-05"`) that were already made in your time zone when you checked
+in. `addDays` and `daysBetween` (in `lib/checkin/date.ts`) do the maths in UTC, where every day is
+exactly 24 h, so daylight saving can never break a streak. The time zone is used once (to make
+the key) and never again.
+
+**Walking through history (a loop with a "state").** `computeStreak` goes through every day from
+your first done day to yesterday, oldest first, keeping a few variables as it goes: `run` (the
+streak so far), `best`, and `lastFreeze` (when the last freeze was used). A done day adds 1. A missed
+day either becomes frozen (rules 3 and 4) or sets `run` back to 0. Today is handled last, and
+separately, because it isn't over. This "walk and keep a state" pattern is common in engineering
+(think of a counter in a circuit).
+
+**A `Set` for fast "is this in the list?".** `new Set(doneDates)` removes duplicates, and
+`done.has(day)` answers instantly, even with years of history. With an array, `includes` would read
+the whole list each time, for every day.
+
+**Comparing date keys as text.** `"2026-11-05" < "2026-11-06"` works with plain string comparison,
+because the year comes first and months and days always have 2 digits. That's why the format has to
+be exactly `YYYY-MM-DD` (and why `isDateKey` is strict).
+
+**Deriving instead of storing (freezes).** We could have saved "freeze used on Nov 3" in the
+database. Instead, freezes are recomputed from your history every time. Nothing can get out of sync
+(e.g. if an offline change for an old day syncs later, the freeze simply moves by itself), and no new table or
+migration was needed. Rule of thumb: store the facts (what you did), compute the rest.
+
+**Paging (Supabase's 1000-row limit).** Supabase sends at most 1000 rows per request. One year of 5
+habits is already 1825 entries, so a single request would silently cut your history short and your
+best streak would be wrong. `fetchAllPages` (in `lib/checkin/supabase.ts`) asks for rows 0 to 999,
+then 1000 to 1999, and so on, until a page comes back with fewer rows. The query must be **sorted**
+(`order("date")`, then `order("habit_id")`), otherwise the database could send the same row twice.
+
+**Only ask for the columns you need (privacy again).** The mood calendar needs `date` and `mood`,
+nothing else. `listCheckinDays` selects exactly those two columns, so a whole season of check-ins is
+loaded without your journal or gratitude texts ever leaving the database.
+
+**Heatmap as a table, and a tested "grid builder".** `buildCalendarGrid` is a pure function that
+returns rows of 7 days (Monday first), the current week last, with each day's level (how dark its
+square is), today, future days and frozen days. `components/streaks/CalendarHeatmap.tsx` only draws
+it as an HTML `<table>`, which is the right element for a calendar: screen readers can move by row and
+column. Each square also has hidden text ("Nov 5: Good", using Tailwind's `sr-only`) so it isn't
+just colour, because some people can't tell the shades apart.
+
+**Tailwind needs whole class names.** The square colours are written out in full
+(`"bg-accent/30"`, `"bg-accent/50"`...) in a small lookup table. Building them at runtime
+(`` `bg-accent/${n}` ``) wouldn't work: Tailwind only creates CSS for classes it finds whole in the
+code. `/30` means "the accent colour at 30% opacity".
+
+**Timing from the clock, not from counting ticks (breathing).** A timer that counts "1 more second"
+every second drifts: browsers slow timers down when the phone is busy or the tab is hidden.
+`breathingState(pattern, elapsedMs)` instead takes "milliseconds since Start" (from
+`performance.now()`, a clock made for measuring that never jumps if the phone changes its time) and
+works out the round, the phase and the countdown. The screen just reads it 10 times a second.
+
+**CSS transitions, and `prefers-reduced-motion`.** We don't move the circle frame by frame in
+JavaScript. When a phase starts, we set two CSS variables: the size to reach (`--breath-scale`) and how
+long to take (`--breath-duration` = the phase length). The browser animates the rest
+(`.breath-circle` in `app/globals.css`). Some people get dizzy or sick from motion on screen and turn
+on "Reduce motion" in their phone settings. The `@media (prefers-reduced-motion: reduce)` rule then
+keeps the circle still at a middle size, and the words ("Breathe in", "Hold") and the countdown guide
+you instead. Only the phase name is in an `aria-live` region, so screen readers announce "Hold" but
+don't read the countdown every second.
+
+**Reused from Stage 2:** the `CheckinStore` interface with its three versions (demo, Supabase, and
+the offline wrapper, which got `overlayCheckinDays` / `overlayEntryRange` so changes still waiting
+to sync show up in your streaks), `todayKey()`, the "load in an effect, ignore it if cancelled"
+pattern, and the service worker's `APP_SHELL` list (now with `/streaks` and `/breathe`).
+
+**Why no new migration?** The new queries are "my rows between two days", and the Stage 2 tables
+already have the right indexes for that: `unique (user_id, date)` on `checkins` and
+`habit_entries_user_date`. RLS already limits them to your own rows. Nothing to change in the
+database, so there's no new SQL file this stage.
+
+### Dependencies
+None added. A date library (date-fns, Luxon) could do `addDays`, but we only needed three small
+functions (about 20 lines), and the heatmap is a plain table with Tailwind classes, not a chart library.
+
+### Offline
+In demo mode, streaks and calendars work fully offline (localStorage). In Supabase mode, the page
+opens offline but says "Streaks and calendars will load when you're back online": the phone only
+keeps the changes waiting to sync, not your whole history, and showing a half-empty history would
+make your streaks look broken. The breathing page needs no data at all, so it always works offline.
+
+### Files in this stage
+- `lib/streaks.ts` (+ test): the streak rules: current/best streak, missed days, freezes, what counts as "done".
+- `lib/calendar.ts` (+ test): builds the heatmap grid (weeks × 7 days) and each day's level (mood or habit).
+- `lib/breathing.ts` (+ test): the two patterns, and which phase/countdown/circle size at any moment.
+- `lib/checkin/date.ts` (+ test): `addDays`, `daysBetween`, `weekdayOf`, DST-proof.
+- `lib/checkin/types.ts`: `CheckinDay` (date + mood) and two new store methods,
+  `listCheckinDays(from, to)` and `listHabitEntries(from, to)`.
+- `lib/checkin/validation.ts` (+ test): `validateDateRange`.
+- `lib/checkin/mock.ts` (+ test): the two range methods for demo mode.
+- `lib/checkin/supabase.ts` (+ test): the two range methods for Supabase, with `fetchAllPages` (paging).
+- `lib/checkin/offline.ts` (+ test): the two range methods for the offline wrapper, and the overlays.
+- `lib/checkin/index.ts`: exports the `CheckinDay` type.
+- `app/streaks/page.tsx` + `components/streaks/StreaksView.tsx`: the streaks and calendar page.
+- `components/streaks/CalendarHeatmap.tsx`: draws the heatmap and its colour key.
+- `components/streaks/useStreakData.ts`: loads habits, check-in days and entries, computes the streaks.
+- `components/streaks/StreaksCard.tsx` + `components/HomeView.tsx`: the home page's Streaks card.
+- `app/breathe/page.tsx` + `components/BreatheView.tsx`: the breathing exercise.
+- `app/globals.css`: the breathing circle animation and its reduced-motion version.
+- `public/sw.js` + `lib/pwa/service-worker.test.ts`: `/streaks` and `/breathe` saved in advance, plus
+  a test that every page in that list really exists (one typo would make the whole install fail).
+- `README.md`, `LEARNING.md`: this.
+
+### Exercise
+Add a **"Done X of the last 30 days"** line under each habit on `/streaks`. First write a pure
+function `doneInLastDays(doneDates, today, days)` in `lib/streaks.ts` that counts how many of the
+`days` days ending today (today included) are in `doneDates`. Write its tests first in
+`streaks.test.ts`: nothing done → 0; done today and yesterday → 2; a day 31 days ago doesn't count; a
+duplicate date counts once; a date after today doesn't count. Run `npm test`, watch them fail, then
+write the function (hint: `addDays(today, -(days - 1))` is the first day, and you can compare keys as
+text). Then show it in `StreaksView.tsx` using `habitDoneDates(habit, data.entries)`.
+Bonus question: should a frozen day count as "done" here? Why or why not?

@@ -177,3 +177,50 @@ describe("demo store: habit entries", () => {
     await expect(store.saveHabitEntry(read, DAY, 2000)).rejects.toThrow("whole number");
   });
 });
+
+describe("demo store: ranges of days (Stage 3, streaks and calendars)", () => {
+  it("lists the check-in days in a range, oldest first, with only the date and mood", async () => {
+    await store.saveCheckin("2026-11-06", { mood: 5, journal_text: "private" });
+    await store.saveCheckin("2026-11-04", { mood: 2 });
+    await store.saveCheckin("2026-11-05", { journal_text: "no mood today" });
+    await store.saveCheckin("2026-10-01", { mood: 3 }); // outside the range
+
+    const days = await store.listCheckinDays("2026-11-01", "2026-11-06"); // both ends included
+    expect(days).toEqual([
+      { date: "2026-11-04", mood: 2 },
+      { date: "2026-11-05", mood: null },
+      { date: "2026-11-06", mood: 5 },
+    ]);
+    // The journal never comes along.
+    expect(JSON.stringify(days)).not.toContain("private");
+  });
+
+  it("lists every habit's entries in a range, archived habits included", async () => {
+    const stretch = await store.createHabit({ name: "Stretch", type: "checkbox" });
+    const water = await store.createHabit({ name: "Water", type: "number", target: 8 });
+    await store.saveHabitEntry(stretch, "2026-11-04", 1);
+    await store.saveHabitEntry(water, "2026-11-04", 6);
+    await store.saveHabitEntry(stretch, "2026-11-05", 1);
+    await store.saveHabitEntry(stretch, "2026-11-20", 1); // outside
+    await store.setHabitArchived(water.id, true);
+
+    const entries = await store.listHabitEntries("2026-11-04", "2026-11-05");
+    expect(entries.map((e) => [e.date, e.value])).toEqual([
+      ["2026-11-04", 1],
+      ["2026-11-04", 6],
+      ["2026-11-05", 1],
+    ]);
+  });
+
+  it("only shows YOUR days, and refuses a backwards or broken range", async () => {
+    await store.saveCheckin(DAY, { mood: 4 });
+    currentUser = "user-b";
+    expect(await store.listCheckinDays("2026-11-01", "2026-11-30")).toEqual([]);
+    expect(await store.listHabitEntries("2026-11-01", "2026-11-30")).toEqual([]);
+
+    await expect(store.listCheckinDays("2026-11-30", "2026-11-01")).rejects.toThrow("after");
+    await expect(store.listHabitEntries("yesterday", "2026-11-01")).rejects.toThrow("range");
+    currentUser = null;
+    await expect(store.listCheckinDays("2026-11-01", "2026-11-30")).rejects.toThrow("logged in");
+  });
+});

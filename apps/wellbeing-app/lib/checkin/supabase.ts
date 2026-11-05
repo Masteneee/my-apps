@@ -9,8 +9,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { isDateKey } from "./date";
 import { fieldsOf } from "./merge";
-import { OfflineError, type Checkin, type CheckinStore, type Habit, type HabitEntry } from "./types";
-import { validateCheckinPatch, validateEntryValue, validateNewHabit } from "./validation";
+import { OfflineError, type Checkin, type CheckinDay, type CheckinStore, type Habit, type HabitEntry } from "./types";
+import { validateCheckinPatch, validateDateRange, validateEntryValue, validateNewHabit } from "./validation";
 
 // Listing the columns (instead of "*") means a new column added later won't
 // silently show up in the app.
@@ -18,6 +18,16 @@ const CHECKIN_COLUMNS =
   "id, user_id, date, mood, mood_tags, screen_time_minutes, gratitude, journal_text, created_at, updated_at";
 const HABIT_COLUMNS = "id, user_id, name, icon, type, target, is_archived, created_at";
 const ENTRY_COLUMNS = "habit_id, user_id, date, value";
+// Stage 3: for calendars and streaks we only ever need the day and the mood.
+// Asking for these two columns means your journal never travels for a calendar.
+const CHECKIN_DAY_COLUMNS = "date, mood";
+
+/**
+ * Supabase sends at most 1000 rows per request (a project setting called
+ * "Max rows"). A year of 5 habits is already 1825 entries, so long lists are
+ * fetched in pages of this size until a page comes back with fewer rows.
+ */
+export const PAGE_SIZE = 1000;
 
 type SupabaseErrorLike = { code?: string; message: string };
 
@@ -47,6 +57,30 @@ export function toStoreError(result: { error: SupabaseErrorLike | null; status?:
   if (!result.error) return null;
   if (result.status === 0) return new OfflineError();
   return new Error(friendlyCheckinError(result.error));
+}
+
+type PageResult<T> = { data: T[] | null; error: SupabaseErrorLike | null; status?: number };
+
+/**
+ * Asks for rows page by page (0-999, then 1000-1999...) and joins them.
+ * `fetchPage(first, last)` asks for the rows numbered first..last (both
+ * included, like Supabase's `.range()`). The query MUST be sorted, otherwise
+ * the database could send the same row in two pages. Tested in supabase.test.ts.
+ */
+export async function fetchAllPages<T>(
+  fetchPage: (first: number, last: number) => PromiseLike<PageResult<T>>,
+  pageSize: number = PAGE_SIZE,
+): Promise<T[]> {
+  const rows: T[] = [];
+  for (let first = 0; ; first += pageSize) {
+    const result = await fetchPage(first, first + pageSize - 1);
+    const error = toStoreError(result);
+    if (error) throw error;
+    const page = result.data ?? [];
+    rows.push(...page);
+    // A page that isn't full means there's nothing after it.
+    if (page.length < pageSize) return rows;
+  }
 }
 
 /** A row from the database, made safe for the app (arrays never null, 3 gratitude slots). */
@@ -175,6 +209,43 @@ export function createSupabaseCheckinStore(supabase: SupabaseClient): CheckinSto
         .single();
       throwIfError(result);
       return result.data as HabitEntry;
+    },
+
+    // Stage 3: ranges of days. Both use the indexes from the Stage 2 migration
+    // (unique (user_id, date) on checkins, habit_entries_user_date), so no new
+    // migration is needed.
+    async listCheckinDays(from, to) {
+      const userId = await requireUser();
+      const range = validateDateRange(from, to);
+      if (!range.ok) throw new Error(range.error);
+      return fetchAllPages<CheckinDay>((first, last) =>
+        supabase
+          .from("checkins")
+          .select(CHECKIN_DAY_COLUMNS)
+          .eq("user_id", userId)
+          .gte("date", from) // gte = "greater than or equal": from this day...
+          .lte("date", to) // ...lte = "less than or equal": up to this day, included
+          .order("date", { ascending: true })
+          .range(first, last),
+      );
+    },
+
+    async listHabitEntries(from, to) {
+      const userId = await requireUser();
+      const range = validateDateRange(from, to);
+      if (!range.ok) throw new Error(range.error);
+      return fetchAllPages<HabitEntry>((first, last) =>
+        supabase
+          .from("habit_entries")
+          .select(ENTRY_COLUMNS)
+          .eq("user_id", userId)
+          .gte("date", from)
+          .lte("date", to)
+          // Sorted by day, then habit: a fixed order, so pages never overlap.
+          .order("date", { ascending: true })
+          .order("habit_id", { ascending: true })
+          .range(first, last),
+      );
     },
 
     // The waiting-to-sync queue lives in ./offline.ts, which wraps this store.

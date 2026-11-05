@@ -22,6 +22,7 @@ import { applyPatch, mergePatches } from "./merge";
 import {
   OfflineError,
   type Checkin,
+  type CheckinDay,
   type CheckinPatch,
   type CheckinStore,
   type Habit,
@@ -30,6 +31,9 @@ import {
 import { validateCheckinPatch, validateEntryValue } from "./validation";
 
 export const PENDING_SYNC_PREFIX = "wellbeing-app:pending-sync:";
+
+/** Shown on the streaks page when it can't reach Supabase. */
+export const RANGE_OFFLINE_MESSAGE = "You're offline. Streaks and calendars will load when you're back online.";
 
 export type SyncStorage = Pick<Storage, "getItem" | "setItem" | "removeItem">;
 
@@ -71,6 +75,47 @@ export function overlayEntries(
     if (p.value !== null) result.push({ habit_id: p.habit.id, user_id: userId, date, value: p.value });
   }
   return result;
+}
+
+/**
+ * Stage 3, for calendars: the check-in days from the server, plus the days
+ * that only exist on this device so far (a check-in saved offline and not
+ * sent yet). A waiting mood replaces the server's. Pure, tested in offline.test.ts.
+ */
+export function overlayCheckinDays(
+  serverDays: CheckinDay[],
+  pending: Record<string, CheckinPatch>,
+  from: string,
+  to: string,
+): CheckinDay[] {
+  const byDate = new Map(serverDays.map((day) => [day.date, { ...day }]));
+  for (const [date, patch] of Object.entries(pending)) {
+    if (date < from || date > to) continue;
+    const day = byDate.get(date) ?? { date, mood: null };
+    if (patch.mood !== undefined) day.mood = patch.mood; // undefined = "not touched"
+    byDate.set(date, day);
+  }
+  return [...byDate.values()].sort((a, b) => a.date.localeCompare(b.date));
+}
+
+/**
+ * Same idea as overlayEntries, for a range of days and every habit: a waiting
+ * value replaces the server's for that habit and day, a waiting null removes it.
+ */
+export function overlayEntryRange(
+  serverEntries: HabitEntry[],
+  pending: PendingEntry[],
+  userId: string,
+  from: string,
+  to: string,
+): HabitEntry[] {
+  const inRange = pending.filter((p) => p.date >= from && p.date <= to);
+  const replaced = new Set(inRange.map((p) => `${p.habit.id}|${p.date}`));
+  const result = serverEntries.filter((e) => !replaced.has(`${e.habit_id}|${e.date}`));
+  for (const p of inRange) {
+    if (p.value !== null) result.push({ habit_id: p.habit.id, user_id: userId, date: p.date, value: p.value });
+  }
+  return result.sort((a, b) => a.date.localeCompare(b.date) || a.habit_id.localeCompare(b.habit_id));
 }
 
 export type OfflineAwareStoreOptions = {
@@ -277,6 +322,34 @@ export function createOfflineAwareStore({
         state.entries[key] = { habit: { id: habit.id, type: habit.type }, date, value: check.value };
         save(userId, state);
         return check.value === null ? null : { habit_id: habit.id, user_id: userId, date, value: check.value };
+      }
+    },
+
+    // Stage 3: ranges, for streaks and calendars. These need the server: this
+    // device only keeps the changes waiting to sync, not your whole history,
+    // so offline they say so instead of showing streaks that look broken.
+    async listCheckinDays(from, to) {
+      const userId = await requireUser();
+      await syncPending();
+      try {
+        const days = await online(() => inner.listCheckinDays(from, to));
+        // Anything that couldn't be sent yet still shows up.
+        return overlayCheckinDays(days, load(userId).checkins, from, to);
+      } catch (error) {
+        if (error instanceof OfflineError) throw new OfflineError(RANGE_OFFLINE_MESSAGE);
+        throw error;
+      }
+    },
+
+    async listHabitEntries(from, to) {
+      const userId = await requireUser();
+      await syncPending();
+      try {
+        const entries = await online(() => inner.listHabitEntries(from, to));
+        return overlayEntryRange(entries, Object.values(load(userId).entries), userId, from, to);
+      } catch (error) {
+        if (error instanceof OfflineError) throw new OfflineError(RANGE_OFFLINE_MESSAGE);
+        throw error;
       }
     },
 

@@ -9,6 +9,7 @@
 // KEEP IN SYNC with the check constraints in
 // supabase/migrations/20261105110000_checkins_habits.sql (a test compares them).
 
+import { isDateKey } from "./date";
 import { HABIT_TYPES, type CheckinPatch, type Habit, type HabitType, type NewHabit } from "./types";
 
 export const MOOD_MIN = 1;
@@ -136,4 +137,15 @@ export function validateEntryValue(habit: Pick<Habit, "type">, value: number | n
     return { ok: false, error: `Use a whole number from 0 to ${max}.` };
   }
   return { ok: true, value };
+}
+
+/**
+ * A range of days for streaks and calendars (Stage 3): two real date keys,
+ * `from` not after `to`. Both stores check this before asking for data.
+ */
+export function validateDateRange(from: string, to: string): Result<{ from: string; to: string }> {
+  if (!isDateKey(from) || !isDateKey(to)) return { ok: false, error: "That range of days doesn't look right." };
+  // YYYY-MM-DD keys compare like dates when compared as text.
+  if (from > to) return { ok: false, error: "The first day of the range is after the last one." };
+  return { ok: true, value: { from, to } };
 }

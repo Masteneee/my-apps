@@ -49,3 +49,21 @@ body {
   /* No grey flash when tapping buttons on phones. */
   -webkit-tap-highlight-color: transparent;
 }
+
+/* Stage 3: the breathing circle (components/BreatheView.tsx). The screen sets
+   two variables: the size to reach (--breath-scale) and how long to take
+   (--breath-duration, the length of the phase). The browser animates it. */
+.breath-circle {
+  transform: scale(var(--breath-scale, 0.5));
+  transition: transform var(--breath-duration, 0.6s) ease-in-out;
+}
+
+/* The phone or computer is set to "reduce motion" (Settings > Accessibility).
+   Some people get dizzy or sick from things that move on screen, so the circle
+   stays still at a middle size; the words and the countdown still guide you. */
+@media (prefers-reduced-motion: reduce) {
+  .breath-circle {
+    transform: scale(0.75);
+    transition: none;
+  }
+}

@@ -78,3 +78,46 @@ export function formatDateKey(key: string, locale = "en-CA"): string {
     day: "numeric",
   });
 }
+
+// ---------------------------------------------------------------------------
+// Counting days between date keys (Stage 3: streaks and calendars)
+// ---------------------------------------------------------------------------
+//
+// Why not just add 24 hours? Because in Toronto two days a year are NOT 24
+// hours long: in March (clocks jump forward) a day lasts 23 h, in November
+// (clocks go back) 25 h. "Now + 24 h" on the November day would land on the
+// same calendar day again, and a streak would count one day twice.
+//
+// The trick: a date key is just a calendar date, with no time and no zone. We
+// do the maths in UTC, where every day is exactly 24 h, then turn the result
+// back into a key. The time zone was already used once, when the key was made
+// (dateKeyInTimeZone above), and never again.
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** The UTC midnight of a date key, in milliseconds. Only used for counting. */
+function keyToUtcMs(key: string): number {
+  const [year, month, day] = key.split("-").map(Number);
+  return Date.UTC(year, month - 1, day);
+}
+
+function utcMsToKey(ms: number): string {
+  return new Date(ms).toISOString().slice(0, 10); // "2026-11-05T00:00:00.000Z" -> "2026-11-05"
+}
+
+/** The date key `days` days later (or earlier, if negative). addDays("2026-02-28", 1) = "2026-03-01". */
+export function addDays(key: string, days: number): string {
+  return utcMsToKey(keyToUtcMs(key) + days * DAY_MS);
+}
+
+/** How many days from `from` to `to`: daysBetween("2026-11-05", "2026-11-07") = 2. Negative if `to` is earlier. */
+export function daysBetween(from: string, to: string): number {
+  // Math.round is just a safety net: both are exact UTC midnights, so the
+  // difference is always a whole number of days.
+  return Math.round((keyToUtcMs(to) - keyToUtcMs(from)) / DAY_MS);
+}
+
+/** Day of the week of a date key: 0 = Sunday, 1 = Monday ... 6 = Saturday. */
+export function weekdayOf(key: string): number {
+  return new Date(keyToUtcMs(key)).getUTCDay();
+}

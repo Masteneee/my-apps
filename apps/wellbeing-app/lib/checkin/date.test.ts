@@ -1,5 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_TIME_ZONE, dateKeyInTimeZone, formatDateKey, isDateKey, isValidTimeZone, todayKey } from "./date";
+import {
+  addDays,
+  dateKeyInTimeZone,
+  daysBetween,
+  DEFAULT_TIME_ZONE,
+  formatDateKey,
+  isDateKey,
+  isValidTimeZone,
+  todayKey,
+  weekdayOf,
+} from "./date";
 
 // All instants are written in UTC ("Z"), so the tests give the same result on
 // any computer, whatever its own time zone.
@@ -86,5 +96,40 @@ describe("formatDateKey", () => {
 
   it("leaves something that isn't a date key as it is", () => {
     expect(formatDateKey("soon")).toBe("soon");
+  });
+});
+
+describe("addDays, daysBetween, weekdayOf (date-key maths)", () => {
+  it("moves forward and backward, across months, years and Feb 29", () => {
+    expect(addDays("2026-11-05", 1)).toBe("2026-11-06");
+    expect(addDays("2026-11-05", -5)).toBe("2026-10-31");
+    expect(addDays("2026-12-31", 1)).toBe("2027-01-01");
+    expect(addDays("2028-02-28", 1)).toBe("2028-02-29"); // leap year
+    expect(addDays("2026-02-28", 1)).toBe("2026-03-01");
+    expect(addDays("2026-11-05", 0)).toBe("2026-11-05");
+  });
+
+  it("is not fooled by the daylight-saving days (23 h in March, 25 h in November)", () => {
+    // In Toronto, Mar 8 2026 lasts 23 hours and Nov 1 2026 lasts 25 hours.
+    // Date keys are counted in UTC, so each one is still exactly one day.
+    expect(addDays("2026-03-07", 1)).toBe("2026-03-08");
+    expect(addDays("2026-03-08", 1)).toBe("2026-03-09");
+    expect(addDays("2026-10-31", 1)).toBe("2026-11-01");
+    expect(addDays("2026-11-01", 1)).toBe("2026-11-02");
+    expect(daysBetween("2026-03-07", "2026-03-09")).toBe(2);
+    expect(daysBetween("2026-10-31", "2026-11-02")).toBe(2);
+  });
+
+  it("counts the days between two keys", () => {
+    expect(daysBetween("2026-11-05", "2026-11-05")).toBe(0);
+    expect(daysBetween("2026-11-05", "2026-11-12")).toBe(7);
+    expect(daysBetween("2026-11-12", "2026-11-05")).toBe(-7);
+    expect(daysBetween("2026-01-01", "2027-01-01")).toBe(365);
+  });
+
+  it("knows the day of the week", () => {
+    expect(weekdayOf("2026-11-05")).toBe(4); // Thursday
+    expect(weekdayOf("2026-11-08")).toBe(0); // Sunday
+    expect(weekdayOf("2026-11-09")).toBe(1); // Monday
   });
 });

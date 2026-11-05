@@ -1,7 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createMemoryStorage } from "../auth/mock";
 import { createMockCheckinStore } from "./mock";
-import { createOfflineAwareStore, overlayEntries, PENDING_SYNC_PREFIX } from "./offline";
+import {
+  createOfflineAwareStore,
+  overlayCheckinDays,
+  overlayEntries,
+  overlayEntryRange,
+  PENDING_SYNC_PREFIX,
+} from "./offline";
 import { OfflineError, type CheckinStore } from "./types";
 
 const DAY = "2026-11-05";
@@ -225,5 +231,78 @@ describe("overlayEntries", () => {
 
   it("returns the server's entries when nothing is waiting", () => {
     expect(overlayEntries(server, [], "u", DAY)).toEqual(server);
+  });
+});
+
+describe("offline-aware store: ranges of days (Stage 3)", () => {
+  it("online, it returns the server's days, plus changes still waiting on this device", async () => {
+    await store.saveCheckin("2026-11-04", { mood: 2 });
+    const water = await server.createHabit({ name: "Water", type: "number" });
+    await store.saveHabitEntry(water, "2026-11-04", 3);
+
+    // Saved offline, then the network comes back. The range call first sends
+    // what's waiting, so the server has everything when it answers.
+    goOffline();
+    await store.saveCheckin(DAY, { mood: 5 });
+    await store.saveHabitEntry(water, DAY, 6);
+    goOnline();
+
+    expect(await store.listCheckinDays("2026-11-01", "2026-11-30")).toEqual([
+      { date: "2026-11-04", mood: 2 },
+      { date: DAY, mood: 5 },
+    ]);
+    expect((await store.listHabitEntries("2026-11-01", "2026-11-30")).map((e) => e.value)).toEqual([3, 6]);
+    expect(await store.pendingSyncCount()).toBe(0); // they were sent first
+  });
+
+  it("offline, it says streaks need the internet (instead of showing a 'broken' streak)", async () => {
+    goOffline();
+    await expect(store.listCheckinDays("2026-11-01", "2026-11-30")).rejects.toThrow("back online");
+    await expect(store.listHabitEntries("2026-11-01", "2026-11-30")).rejects.toBeInstanceOf(OfflineError);
+  });
+});
+
+describe("overlayCheckinDays and overlayEntryRange", () => {
+  it("adds days that only exist on this device, and a waiting mood wins", () => {
+    const result = overlayCheckinDays(
+      [
+        { date: "2026-11-03", mood: 3 },
+        { date: "2026-11-04", mood: 2 },
+      ],
+      {
+        "2026-11-04": { mood: 4 },
+        "2026-11-05": { journal_text: "no mood" }, // a new day, mood untouched
+        "2026-10-01": { mood: 1 }, // outside the range
+      },
+      "2026-11-01",
+      "2026-11-30",
+    );
+    expect(result).toEqual([
+      { date: "2026-11-03", mood: 3 },
+      { date: "2026-11-04", mood: 4 },
+      { date: "2026-11-05", mood: null },
+    ]);
+  });
+
+  it("replaces, removes and adds habit values in the range, sorted by day", () => {
+    const serverEntries = [
+      { habit_id: "h1", user_id: "u", date: "2026-11-03", value: 1 },
+      { habit_id: "h1", user_id: "u", date: "2026-11-04", value: 1 },
+    ];
+    const result = overlayEntryRange(
+      serverEntries,
+      [
+        { habit: { id: "h1", type: "checkbox" }, date: "2026-11-04", value: null }, // unticked offline
+        { habit: { id: "h2", type: "number" }, date: "2026-11-02", value: 5 },
+        { habit: { id: "h2", type: "number" }, date: "2026-12-01", value: 5 }, // outside
+      ],
+      "u",
+      "2026-11-01",
+      "2026-11-30",
+    );
+    expect(result.map((e) => [e.habit_id, e.date])).toEqual([
+      ["h2", "2026-11-02"],
+      ["h1", "2026-11-03"],
+    ]);
   });
 });

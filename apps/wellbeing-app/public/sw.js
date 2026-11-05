@@ -34,11 +34,14 @@ const STATIC_CACHE = `${CACHE_PREFIX}static-${CACHE_VERSION}`;
 // The "app shell": pages saved in advance, when the service worker installs,
 // so they open offline even if you never visited them.
 // Stage 2: "/checkin" (the daily check-in) and "/habits" (add/archive habits).
+// Stage 3: "/streaks" (streaks + calendars) and "/breathe" (breathing exercise).
 // They are page SHELLS, the same for everyone: your answers are never in here.
 const APP_SHELL = [
   "/",
   "/checkin",
   "/habits",
+  "/streaks",
+  "/breathe",
   "/login",
   "/signup",
   "/onboarding",

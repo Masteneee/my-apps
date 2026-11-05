@@ -2,13 +2,14 @@
 // The home page. What it shows depends on who is looking:
 // - signed out       -> a short welcome with "Create an account" / "Log in"
 // - no username yet  -> sent to /onboarding
-// - signed in        -> "Today": the check-in card (Stage 2) and streaks (Stage 3)
+// - signed in        -> "Today": the check-in card (Stage 2) and the streaks card (Stage 3)
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { greetingFor, nameToShow } from "@/lib/home/greeting";
 import { useAuth } from "./AuthProvider";
+import { StreaksCard } from "./streaks/StreaksCard";
 import { TodayCheckinCard } from "./TodayCheckinCard";
 import { buttonPrimary, buttonSecondary, card } from "./ui";
 
@@ -58,10 +59,7 @@ export function HomeView() {
 
       <TodayCheckinCard />
 
-      <section className={card}>
-        <h2 className="font-semibold">Streaks</h2>
-        <p className="mt-1 text-sm text-muted">No streaks yet. They start with your first check-in.</p>
-      </section>
+      <StreaksCard />
     </div>
   );
 }
