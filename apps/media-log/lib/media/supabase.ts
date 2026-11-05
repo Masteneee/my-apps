@@ -4,11 +4,11 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Log, LogWithMedia, MediaItem, MediaStore, NewLogInput } from "./types";
-import { localToday, mediaItemFields, validateLogInput } from "./validation";
+import { localToday, mediaItemFields, planLogUpdate, validateLogInput } from "./validation";
 
 const MEDIA_COLUMNS = "id, type, source, source_id, title, year, cover_url, creators, total_units, cached_at";
 const LOG_COLUMNS =
-  "id, user_id, media_item_id, status, rating, progress, review_text, started_at, finished_at, rewatch, created_at";
+  "id, user_id, media_item_id, status, rating, progress, progress_unit, review_text, started_at, finished_at, rewatch, created_at";
 // "media:media_items(...)" asks Supabase to also fetch the media item each log
 // points to (through the media_item_id foreign key) and put it under `media`.
 // One request instead of one per log.
@@ -26,15 +26,23 @@ export function friendlyMediaError(error: { code?: string; message: string }): s
     case "42P01": // Postgres: table doesn't exist
     case "PGRST205": // Supabase API: table not found
       return "The media tables don't exist yet. Run the Stage 2 migration in Supabase (see README.md).";
+    case "42703": // Postgres: column doesn't exist (reading progress_unit)
+    case "PGRST204": // Supabase API: column not found (writing progress_unit)
+      return "The database is missing the Stage 4 progress columns. Run the Stage 4 migration in Supabase (see README.md).";
     default:
       return error.message || "Something went wrong. Please try again.";
   }
 }
 
 // Supabase returns Postgres `numeric` values as numbers, but we convert with
-// Number() anyway in case one arrives as text ("3.5").
+// Number() anyway in case one arrives as text ("3.5"). Since Stage 4,
+// `progress` is numeric too (12.5 hours).
 function toLogWithMedia(row: Log & { media: MediaItem }): LogWithMedia {
-  return { ...row, rating: row.rating === null ? null : Number(row.rating) };
+  return {
+    ...row,
+    rating: row.rating === null ? null : Number(row.rating),
+    progress: row.progress === null ? null : Number(row.progress),
+  };
 }
 
 export function createSupabaseMediaStore(supabase: SupabaseClient): MediaStore {
@@ -98,6 +106,56 @@ export function createSupabaseMediaStore(supabase: SupabaseClient): MediaStore {
         .order("created_at", { ascending: false });
       if (error) throw new Error(friendlyMediaError(error));
       return (data as unknown as (Log & { media: MediaItem })[]).map(toLogWithMedia);
+    },
+
+    async getMediaItem({ type, source, sourceId }) {
+      const { data, error } = await supabase
+        .from("media_items")
+        .select(MEDIA_COLUMNS)
+        .eq("type", type)
+        .eq("source", source)
+        .eq("source_id", sourceId)
+        .maybeSingle(); // null instead of an error when nobody logged it yet
+      if (error) throw new Error(friendlyMediaError(error));
+      return (data as MediaItem | null) ?? null;
+    },
+
+    async getLogsForItem(mediaItemId) {
+      // Everyone's logs of this item (logs are public, see the RLS policies).
+      // The index logs_media_item_id_idx from Stage 2 makes this lookup fast.
+      const { data, error } = await supabase
+        .from("logs")
+        .select(LOG_WITH_MEDIA_COLUMNS)
+        .eq("media_item_id", mediaItemId)
+        .order("created_at", { ascending: false });
+      if (error) throw new Error(friendlyMediaError(error));
+      return (data as unknown as (Log & { media: MediaItem })[]).map(toLogWithMedia);
+    },
+
+    async updateLog(logId, change) {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const user = sessionData.session?.user;
+      if (!user) throw new Error("You need to be logged in to change a log.");
+
+      // Read the log first: planLogUpdate needs its item (total episodes...) and current status.
+      const current = await supabase.from("logs").select(LOG_WITH_MEDIA_COLUMNS).eq("id", logId).maybeSingle();
+      if (current.error) throw new Error(friendlyMediaError(current.error));
+      if (!current.data) throw new Error("That log doesn't exist anymore. Reload the page.");
+      const log = toLogWithMedia(current.data as unknown as Log & { media: MediaItem });
+      // A friendly early check; RLS would refuse anyway (the update would match no row).
+      if (log.user_id !== user.id) throw new Error("You can only change your own logs.");
+
+      const planned = planLogUpdate(log, change, localToday());
+      if (!planned.ok) throw new Error(planned.error);
+
+      const { data, error } = await supabase
+        .from("logs")
+        .update(planned.value)
+        .eq("id", logId)
+        .select(LOG_WITH_MEDIA_COLUMNS)
+        .single();
+      if (error) throw new Error(friendlyMediaError(error));
+      return toLogWithMedia(data as unknown as Log & { media: MediaItem });
     },
   };
 }

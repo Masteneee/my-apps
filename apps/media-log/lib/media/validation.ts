@@ -2,7 +2,17 @@
 // Supabase) call validateLogInput(), so the rules live in one place.
 // The database checks the same things again (see the logs table in the migration).
 
-import { LOG_STATUSES, type LogStatus, type MediaItem, type MediaResult, type NewLogInput } from "./types";
+import { reachedEnd, validateProgress } from "./progress";
+import {
+  LOG_STATUSES,
+  type LogStatus,
+  type LogUpdateInput,
+  type LogWithMedia,
+  type MediaItem,
+  type MediaResult,
+  type NewLogInput,
+  type ProgressUnit,
+} from "./types";
 
 export const RATING_MIN = 0.5;
 export const RATING_MAX = 5;
@@ -65,7 +75,12 @@ export type CleanLogFields = {
   review_text: string | null;
   finished_at: string | null;
   rewatch: boolean;
+  progress: number | null;
+  progress_unit: ProgressUnit | null;
 };
+
+const PLANNED_RATING_ERROR =
+  "You can't rate something you haven't watched, read or played yet. Remove the rating or change the status.";
 
 /**
  * Checks the whole form and returns either the cleaned values or the first
@@ -81,11 +96,16 @@ export function validateLogInput(input: NewLogInput, today: string): Result<Clea
   if (!rating.ok) return rating;
   // You can't rate what you haven't seen yet.
   if (input.status === "planned" && rating.value !== null) {
-    return {
-      ok: false,
-      error: "You can't rate something you haven't watched, read or played yet. Remove the rating or change the status.",
-    };
+    return { ok: false, error: PLANNED_RATING_ERROR };
   }
+
+  // Progress (Stage 4). "Want to watch" means you haven't started, so no progress.
+  const hasProgress = input.progress !== null && input.progress !== undefined;
+  if (input.status === "planned" && hasProgress) {
+    return { ok: false, error: "You haven't started it yet, so there's no progress to save. Clear it or change the status." };
+  }
+  const progress = validateProgress(input.media.type, input.progress, input.progressUnit, input.media.totalUnits);
+  if (!progress.ok) return progress;
 
   const review = (input.reviewText ?? "").trim();
   if (review.length > REVIEW_MAX) {
@@ -114,6 +134,56 @@ export function validateLogInput(input: NewLogInput, today: string): Result<Clea
       review_text: review || null, // "" becomes null, like display names
       finished_at: finishedAt,
       rewatch: finished && input.rewatch === true,
+      ...progress.value,
+    },
+  };
+}
+
+/** The columns the progress tracker changes on an existing log. */
+export type LogUpdateFields = Pick<CleanLogFields, "status" | "progress" | "progress_unit" | "finished_at" | "rewatch">;
+
+/**
+ * Works out what to save when the progress tracker changes a log, so both
+ * stores follow exactly the same rules. `today` is "YYYY-MM-DD".
+ *
+ * On top of checking the values, it fixes the status the way you'd expect,
+ * but only when you changed the progress:
+ * - "Want to watch" + you add progress     -> "Watching" (you've obviously started)
+ * - "Watching" + you reach the end or 100% -> "Watched" (finished today)
+ * Dropped and Paused are left alone: that's a choice you made on purpose.
+ */
+export function planLogUpdate(log: LogWithMedia, change: LogUpdateInput, today: string): Result<LogUpdateFields> {
+  if (!isLogStatus(change.status)) return { ok: false, error: "Pick a status." };
+
+  const checked = validateProgress(log.media.type, change.progress, change.progressUnit, log.media.total_units);
+  if (!checked.ok) return checked;
+  const { progress, progress_unit } = checked.value;
+
+  // The automatic status changes only happen when you CHANGED the progress.
+  // The tracker's box is pre-filled with the saved progress, so "there is a
+  // progress" doesn't mean "you just added it": switching a finished 25/25
+  // anime back to "Watching" (a rewatch) must not finish it again right away.
+  const progressChanged = progress !== log.progress || progress_unit !== log.progress_unit;
+  let status: LogStatus = change.status;
+  if (progressChanged && status === "planned" && progress !== null && progress > 0) status = "in_progress";
+  if (progressChanged && status === "in_progress" && reachedEnd(progress, progress_unit, log.media.total_units)) {
+    status = "completed";
+  }
+
+  if (status === "planned" && log.rating !== null) return { ok: false, error: PLANNED_RATING_ERROR };
+
+  const completed = status === "completed";
+  return {
+    ok: true,
+    value: {
+      status,
+      // "Want to watch" never keeps a progress (0 episodes = not started).
+      progress: status === "planned" ? null : progress,
+      progress_unit: status === "planned" ? null : progress_unit,
+      // Keep the date you entered if it was already finished; otherwise it's finished today.
+      finished_at: completed ? (log.status === "completed" ? log.finished_at : today) : null,
+      // Same rule as the form: "rewatch" only makes sense on a finished log.
+      rewatch: completed && log.rewatch,
     },
   };
 }
@@ -132,5 +202,25 @@ export function mediaItemFields(result: MediaResult): Omit<MediaItem, "id" | "ca
     cover_url: result.coverUrl,
     creators: result.creators,
     total_units: result.totalUnits,
+  };
+}
+
+/**
+ * The other way round: a cached item back into a search result, so the item
+ * page can reuse the same "log this" form as the search page.
+ * (The original title and description aren't cached, so they're empty.)
+ */
+export function mediaItemToResult(item: MediaItem): MediaResult {
+  return {
+    type: item.type,
+    source: item.source,
+    sourceId: item.source_id,
+    title: item.title,
+    originalTitle: null,
+    year: item.year,
+    coverUrl: item.cover_url,
+    creators: item.creators,
+    totalUnits: item.total_units,
+    overview: null,
   };
 }

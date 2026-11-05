@@ -4,9 +4,12 @@ One place to log, rate and review everything you watch, read and play: movies, s
 books and games. Think Letterboxd, but for every kind of media, with one profile. See `PLAN.md` for
 the full plan and `LEARNING.md` for what each stage taught.
 
-**Status:** Stage 3 (unified search) done. One search bar finds movies and series (TMDB), anime and manga
+**Status:** Stage 4 (tracking + diary) done. One search bar finds movies and series (TMDB), anime and manga
 (AniList), books (Open Library) and games (IGDB), merged into one list without duplicates. You can log any
-of them with a status, rating and review, and see them grouped by type on your profile at `/u/username`.
+of them with a status, rating, review and **progress** (episode 7/24, chapter 120/?, 45% of a book, 12.5
+hours in a game), see them grouped by type on your profile at `/u/username`, read your **diary** (every log,
+grouped by month) at `/u/username/diary`, and open any logged item's page at `/media/<type>/<source>-<id>`
+(cover, info, your log with a progress tracker, everyone's average rating).
 
 ## Run it
 
@@ -39,7 +42,9 @@ touches this folder.
 1. Create a free project at supabase.com.
 2. SQL Editor > New query > paste `supabase/migrations/20261105000000_profiles.sql` > Run. Then do the
    same with `supabase/migrations/20261105010000_media_logs_lists_follows.sql` (order matters: the second
-   file points to the `profiles` table). Table Editor should now show 6 tables, each marked "RLS enabled".
+   file points to the `profiles` table), then `supabase/migrations/20261105020000_progress_units.sql`
+   (Stage 4: adds `logs.progress_unit` and lets `progress` hold 12.5 hours). Table Editor should now show 6
+   tables, each marked "RLS enabled", and `logs` should have a `progress_unit` column.
 3. Project Settings > API: copy the Project URL and the anon (or "publishable") key.
 4. `cp .env.example .env.local` and paste them in. Never use the `service_role` / secret key here.
 5. Authentication > URL Configuration: Site URL `http://localhost:3000`, and add
@@ -122,6 +127,25 @@ offline).
 15. Search `zzz`: "Nothing found". With the **Anime** chip: "No anime found". Covers need internet;
     without it, each cover shows its title instead.
 
+16. **Progress (Stage 4).** Search `berserk`, log the **manga** as **Reading**: a "Chapters read" box
+    appears, "of ? chapters" (the sample has no total). Type `120`, save. Log the anime Spirited Away
+    (1 episode) as **Watching** and type `2`: "It only has 1 episode...". Log the Dune book as **Reading**:
+    switch the box to `%` and type `45`. Log *The Witcher 3* as **Finished** with `60.5` hours played, rated.
+17. Open your profile: Berserk shows "Chapter 120/?" and the book "45%" under the poster. Click a poster:
+    the **item page** opens with cover, info, "average from 1 rating" (or "No ratings yet") and **My log**.
+18. On the Berserk page, press **+1 ch** twice: "Chapter 122/?". Log the Attack on Titan **anime** (25
+    episodes) as **Watching** at `24`, open its page (link in the green message), press **+1 ep**: 25/25, the
+    status turns to "Watched" by itself ("Marked as Watched"), dated today. Pick "Watching" again (number
+    unchanged) and Save: it stays "Watching" (a rewatch isn't finished again right away).
+19. On the Witcher page (rated), pick **Want to play** and Save: refused ("can't rate something you haven't
+    played"). Press **Log it again** to add a second diary entry; the old one moves under "Earlier".
+20. **Average rating:** log out, sign up a second account with a username, rate the same item differently.
+    The item page now says "average from 2 ratings". Each person counts once (their latest rating).
+21. **Diary:** on your profile click **Diary** (or open `/u/<you>/diary`): one section per month, newest
+    first, with the day, poster, type, status, progress, review and stars. An item logged with a past
+    "Watched on" date goes under THAT month. Open `/media/movie/tmdb-1`: "Not in Media Log yet".
+    `/media/podcast/x`: the 404 page.
+
 To reset demo data: DevTools > Application > Local Storage > delete `media-log:mock-db` (accounts) and
 `media-log:mock-media` (logs).
 
@@ -130,9 +154,13 @@ To reset demo data: DevTools > Application > Local Storage > delete `media-log:m
 ```
 app/                 pages (folder = URL), layout, global CSS
 app/api/             route handlers: server-only URLs that answer JSON (/api/search)
-components/          React components (forms, nav bar, profile view, search, poster grid, AuthProvider)
+app/media/[type]/[id]/  the item page (/media/anime/anilist-16498)
+app/u/[username]/diary/ the diary page
+components/          React components (forms, nav bar, profile, diary, item page, progress tracker, search,
+                     poster grid, AuthProvider, useProfileLogs hook)
 lib/auth/            the AuthService interface + mock and Supabase backends + validation (+ tests)
-lib/media/           the MediaStore interface (logs) + mock and Supabase stores + log validation (+ tests)
+lib/media/           the MediaStore interface (logs) + mock and Supabase stores + log validation, progress
+                     math (progress.ts), diary grouping (diary.ts), item page links (links.ts) (+ tests)
 lib/sources/         one adapter per search source (tmdb, anilist, openlibrary, igdb), merging + dedup,
                      the unified search, env setup, saved sample answers in samples/ (+ tests)
 lib/supabase/        the one shared Supabase client
@@ -152,3 +180,9 @@ Search: the page calls `GET /api/search?q=dune&type=all` (`app/api/search/route.
 3. `lib/sources/merge.ts` interleaves the types, merges duplicates, and puts exact title matches first.
 4. The answer is `{ query, filter, results, sources }`, where `sources` says which source was live, used
    samples (and why) or failed (and why).
+
+Item page: `/media/<type>/<source>-<source id>` (e.g. `/media/book/openlibrary-OL893415W`). The server part
+(`app/media/[type]/[id]/page.tsx`) only checks the address (`lib/media/links.ts`); the browser part
+(`components/MediaItemView.tsx`) asks the store for the cached item (`getMediaItem`) and everyone's logs of it
+(`getLogsForItem`), and the tracker saves with `updateLog`. Only items someone has logged exist there (we
+never copy whole catalogs); others show "Not in Media Log yet".

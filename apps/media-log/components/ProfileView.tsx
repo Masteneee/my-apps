@@ -1,63 +1,19 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
-import { getAuthService, type Profile } from "@/lib/auth";
-import { normalizeUsername } from "@/lib/auth/validation";
-import { getMediaStore, type LogWithMedia } from "@/lib/media";
 import { countByType, groupByType, latestLogPerItem, TYPE_LABELS } from "@/lib/media/display";
 import { MEDIA_TYPES } from "@/lib/media/types";
 import { useAuth } from "./AuthProvider";
 import { PosterGrid } from "./PosterGrid";
-
-// The result of looking up a username. We keep the username we looked up next
-// to the result, so after navigating to another profile we know the old
-// result is stale and show "Loading" instead of the wrong person.
-type Lookup = {
-  username: string;
-  profile: Profile | null;
-  logs: LogWithMedia[]; // newest first
-  error: string | null; // the profile itself couldn't load
-  logsError: string | null; // the profile loaded, but its logs didn't
-};
-
-// Loads the profile, then (if it exists) its logs. Kept outside the component
-// because it doesn't need any React state.
-async function loadProfilePage(username: string): Promise<Lookup> {
-  const profile = await getAuthService().getProfileByUsername(username);
-  if (!profile) return { username, profile: null, logs: [], error: null, logsError: null };
-  try {
-    const logs = await getMediaStore().getLogsForUser(profile.id);
-    return { username, profile, logs, error: null, logsError: null };
-  } catch (err) {
-    // e.g. the Stage 2 tables don't exist yet: still show the profile, plus the reason.
-    const message = err instanceof Error ? err.message : "Could not load the logs.";
-    return { username, profile, logs: [], error: null, logsError: message };
-  }
-}
+import { useProfileLogs } from "./useProfileLogs";
 
 export function ProfileView({ username }: { username: string }) {
   const { user } = useAuth();
-  const [lookup, setLookup] = useState<Lookup | null>(null);
-  const wanted = normalizeUsername(username);
-
-  useEffect(() => {
-    let cancelled = false;
-    loadProfilePage(wanted)
-      .then((result) => {
-        if (!cancelled) setLookup(result);
-      })
-      .catch((err: unknown) => {
-        const message = err instanceof Error ? err.message : "Could not load this profile.";
-        if (!cancelled) setLookup({ username: wanted, profile: null, logs: [], error: message, logsError: null });
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [wanted]);
+  // Loading the profile and its logs is shared with the diary page (see useProfileLogs.ts).
+  const { wanted, lookup } = useProfileLogs(username);
 
   // Still loading (or loading a different username after navigation).
-  if (!lookup || lookup.username !== wanted) {
+  if (!lookup) {
     return <p className="text-zinc-400">Loading profile...</p>;
   }
 
@@ -127,13 +83,16 @@ export function ProfileView({ username }: { username: string }) {
 
       {groups.length > 0 ? (
         <>
-          {isMe && (
-            <p className="mt-8 text-right">
-              <Link href="/search" className="text-sm text-violet-400 hover:underline">
+          <p className="mt-8 flex justify-end gap-4 text-sm">
+            <Link href={`/u/${profile.username}/diary`} className="text-violet-400 hover:underline">
+              Diary
+            </Link>
+            {isMe && (
+              <Link href="/search" className="text-violet-400 hover:underline">
                 Log something else
               </Link>
-            </p>
-          )}
+            )}
+          </p>
           {/* One section per media type that has something in it. */}
           {groups.map((group) => (
             <section key={group.type} className="mt-6">

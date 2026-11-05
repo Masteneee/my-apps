@@ -1,5 +1,5 @@
 "use client";
-// The "log this" form: status, rating, review, finished date, rewatch.
+// The "log this" form: status, rating, progress (Stage 4), review, finished date, rewatch.
 // It works for every media type; only the words change ("Watched" for a
 // movie, "Read" for a book, "Finished" for a game), see wordsFor().
 // The rules (rating in half steps, no rating for "Want to watch"...) live in
@@ -8,28 +8,39 @@
 import { useState } from "react";
 import { ratingToStars, TYPE_LABELS, unitsLabel, wordsFor } from "@/lib/media/display";
 import { getMediaStore, type LogStatus, type LogWithMedia, type MediaResult } from "@/lib/media";
-import { LOG_STATUSES } from "@/lib/media/types";
+import { defaultProgressUnit, parseProgressText, progressFieldLabel } from "@/lib/media/progress";
+import { LOG_STATUSES, type ProgressUnit } from "@/lib/media/types";
 import { localToday, RATING_OPTIONS, REVIEW_MAX } from "@/lib/media/validation";
 import { Poster } from "./Poster";
+import { ProgressField } from "./ProgressField";
 
 type Props = {
   media: MediaResult;
   onSaved: (log: LogWithMedia) => void;
   onCancel: () => void;
+  /** The text of the cancel button: "Back to results" on the search page, "Cancel" on an item page. */
+  cancelLabel?: string;
 };
 
-export function LogMediaForm({ media, onSaved, onCancel }: Props) {
+export function LogMediaForm({ media, onSaved, onCancel, cancelLabel = "Back to results" }: Props) {
   const [status, setStatus] = useState<LogStatus>("completed");
   const [rating, setRating] = useState<number | null>(null);
   const [review, setReview] = useState("");
   const [finishedAt, setFinishedAt] = useState(() => localToday());
   const [rewatch, setRewatch] = useState(false);
+  // Progress is typed as text so the box can be empty ("" = no progress).
+  const [progressText, setProgressText] = useState("");
+  const [progressUnit, setProgressUnit] = useState<ProgressUnit | null>(() => defaultProgressUnit(media.type));
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   const words = wordsFor(media.type);
   const finished = status === "completed";
   const canRate = status !== "planned";
+  // Progress makes sense once you've started and before you've finished (7/24),
+  // and for games also when finished ("finished in 60 hours"). Movies have none.
+  const showProgress =
+    progressUnit !== null && status !== "planned" && (status !== "completed" || media.type === "game");
   const details = [media.creators.join(", "), unitsLabel(media.type, media.totalUnits)].filter(Boolean).join(" · ");
 
   function changeStatus(next: LogStatus) {
@@ -50,6 +61,9 @@ export function LogMediaForm({ media, onSaved, onCancel }: Props) {
         reviewText: review,
         finishedAt: finished && finishedAt ? finishedAt : null,
         rewatch,
+        // A hidden progress box is not sent, even if something was typed before.
+        progress: showProgress ? parseProgressText(progressText) : null,
+        progressUnit,
       });
       onSaved(log);
     } catch (err) {
@@ -142,6 +156,21 @@ export function LogMediaForm({ media, onSaved, onCancel }: Props) {
         )}
       </div>
 
+      {showProgress && progressUnit && (
+        <div className="mt-5">
+          <ProgressField
+            id="progress"
+            label={progressFieldLabel(media.type)}
+            type={media.type}
+            totalUnits={media.totalUnits}
+            value={progressText}
+            unit={progressUnit}
+            onValueChange={setProgressText}
+            onUnitChange={setProgressUnit}
+          />
+        </div>
+      )}
+
       {finished && (
         <label className="mt-4 flex items-center gap-2 text-sm text-zinc-300">
           <input
@@ -184,7 +213,7 @@ export function LogMediaForm({ media, onSaved, onCancel }: Props) {
           onClick={onCancel}
           className="rounded-md border border-zinc-700 px-4 py-2.5 font-medium hover:bg-zinc-800"
         >
-          Back to results
+          {cancelLabel}
         </button>
         <button
           type="submit"

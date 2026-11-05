@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
-import type { MediaResult, NewLogInput } from "./types";
+import type { LogWithMedia, MediaResult, NewLogInput } from "./types";
 import {
   isValidDate,
   localToday,
   mediaItemFields,
+  mediaItemToResult,
+  planLogUpdate,
   RATING_OPTIONS,
   validateLogInput,
   validateRating,
@@ -97,6 +99,8 @@ describe("validateLogInput", () => {
         review_text: "Loved the docking scene.",
         finished_at: "2026-11-01",
         rewatch: true,
+        progress: null, // a movie has no progress (Stage 4)
+        progress_unit: null,
       },
     });
   });
@@ -157,5 +161,146 @@ describe("mediaItemFields", () => {
       creators: [],
       total_units: null,
     });
+  });
+});
+
+describe("mediaItemToResult", () => {
+  it("turns a cached item back into a search result (round trip)", () => {
+    const item = { id: "item-1", ...mediaItemFields(movie), cached_at: "2026-11-05T12:00:00.000Z" };
+    expect(mediaItemToResult(item)).toEqual({ ...movie, overview: null });
+  });
+});
+
+// Stage 4: progress in the "log this" form.
+const anime: MediaResult = { ...movie, type: "anime", source: "anilist", sourceId: "16498", totalUnits: 25 };
+
+describe("validateLogInput with progress", () => {
+  it("has no progress by default (older callers don't send it)", () => {
+    const result = validateLogInput(base, TODAY);
+    expect(result.ok && [result.value.progress, result.value.progress_unit]).toEqual([null, null]);
+  });
+
+  it("saves episode 7 for an anime you're watching", () => {
+    const result = validateLogInput({ ...base, media: anime, status: "in_progress", progress: 7 }, TODAY);
+    expect(result.ok && result.value).toMatchObject({ status: "in_progress", progress: 7, progress_unit: "episode" });
+  });
+
+  it("refuses progress on something you haven't started", () => {
+    const result = validateLogInput({ ...base, media: anime, status: "planned", rating: null, progress: 3 }, TODAY);
+    expect(result).toEqual({ ok: false, error: expect.stringContaining("haven't started") });
+  });
+
+  it("passes on progress errors (past the last episode, movies)", () => {
+    expect(validateLogInput({ ...base, media: anime, status: "in_progress", progress: 26 }, TODAY).ok).toBe(false);
+    expect(validateLogInput({ ...base, status: "in_progress", progress: 1 }, TODAY).ok).toBe(false);
+  });
+});
+
+// A log as the stores return it; `extra` changes the parts a test is about.
+function animeLog(extra: Partial<LogWithMedia> = {}): LogWithMedia {
+  return {
+    id: "log-1",
+    user_id: "user-1",
+    media_item_id: "item-1",
+    status: "in_progress",
+    rating: null,
+    progress: 7,
+    progress_unit: "episode",
+    review_text: null,
+    started_at: null,
+    finished_at: null,
+    rewatch: false,
+    created_at: "2026-11-01T12:00:00.000Z",
+    media: { id: "item-1", ...mediaItemFields(anime), cached_at: "2026-11-01T12:00:00.000Z" },
+    ...extra,
+  };
+}
+
+describe("planLogUpdate (the progress tracker)", () => {
+  it("saves a new episode count", () => {
+    const result = planLogUpdate(animeLog(), { status: "in_progress", progress: 8, progressUnit: "episode" }, TODAY);
+    expect(result).toEqual({
+      ok: true,
+      value: { status: "in_progress", progress: 8, progress_unit: "episode", finished_at: null, rewatch: false },
+    });
+  });
+
+  it("marks it finished today when you reach the last episode", () => {
+    const result = planLogUpdate(animeLog(), { status: "in_progress", progress: 25, progressUnit: "episode" }, TODAY);
+    expect(result.ok && result.value).toMatchObject({ status: "completed", progress: 25, finished_at: TODAY });
+  });
+
+  it("moves 'Want to watch' to 'Watching' when you add progress", () => {
+    const log = animeLog({ status: "planned", progress: null, progress_unit: null });
+    const result = planLogUpdate(log, { status: "planned", progress: 1, progressUnit: null }, TODAY);
+    expect(result.ok && result.value).toMatchObject({ status: "in_progress", progress: 1, progress_unit: "episode" });
+  });
+
+  it("goes straight from 'Want to watch' to finished if you enter the last episode", () => {
+    const log = animeLog({ status: "planned", progress: null, progress_unit: null });
+    const result = planLogUpdate(log, { status: "planned", progress: 25, progressUnit: "episode" }, TODAY);
+    expect(result.ok && result.value.status).toBe("completed");
+  });
+
+  it("leaves Dropped and Paused alone, even at the end", () => {
+    const result = planLogUpdate(animeLog(), { status: "dropped", progress: 25, progressUnit: "episode" }, TODAY);
+    expect(result.ok && result.value.status).toBe("dropped");
+  });
+
+  it("clears progress when you go back to 'Want to watch'", () => {
+    const result = planLogUpdate(animeLog(), { status: "planned", progress: 0, progressUnit: "episode" }, TODAY);
+    expect(result.ok && result.value).toMatchObject({ status: "planned", progress: null, progress_unit: null });
+  });
+
+  it("refuses 'Want to watch' on a rated log (same rule as the form)", () => {
+    const log = animeLog({ rating: 4 });
+    const result = planLogUpdate(log, { status: "planned", progress: null, progressUnit: null }, TODAY);
+    expect(result).toEqual({ ok: false, error: expect.stringContaining("can't rate") });
+  });
+
+  it("keeps the finished date you entered, and clears it if you start again", () => {
+    const done = animeLog({ status: "completed", progress: 25, finished_at: "2026-10-01", rewatch: true });
+    const stillDone = planLogUpdate(done, { status: "completed", progress: 25, progressUnit: "episode" }, TODAY);
+    expect(stillDone.ok && stillDone.value).toMatchObject({ finished_at: "2026-10-01", rewatch: true });
+
+    const again = planLogUpdate(done, { status: "in_progress", progress: 3, progressUnit: "episode" }, TODAY);
+    expect(again.ok && again.value).toMatchObject({ status: "in_progress", finished_at: null, rewatch: false });
+  });
+
+  // Found while clicking through the app: the tracker's box is pre-filled with
+  // the saved progress, so "the progress is there" doesn't mean "you just added it".
+  it("refuses 'Want to play' on a rated game, even with its hours still in the box", () => {
+    const finishedGame = animeLog({
+      status: "completed",
+      rating: 4.5,
+      progress: 60.5,
+      progress_unit: "hour",
+      finished_at: "2026-09-14",
+      media: { ...animeLog().media, type: "game", source: "igdb", total_units: null },
+    });
+    const result = planLogUpdate(finishedGame, { status: "planned", progress: 60.5, progressUnit: "hour" }, TODAY);
+    expect(result).toEqual({ ok: false, error: expect.stringContaining("can't rate") });
+  });
+
+  it("lets you go back to 'Watching' at 25/25 (a rewatch) without finishing it again", () => {
+    const done = animeLog({ status: "completed", progress: 25, finished_at: "2026-10-01" });
+    const result = planLogUpdate(done, { status: "in_progress", progress: 25, progressUnit: "episode" }, TODAY);
+    expect(result.ok && result.value).toMatchObject({ status: "in_progress", progress: 25, finished_at: null });
+  });
+
+  it("refuses bad progress and unknown statuses", () => {
+    expect(planLogUpdate(animeLog(), { status: "in_progress", progress: 26, progressUnit: "episode" }, TODAY).ok).toBe(false);
+    // @ts-expect-error: testing a value TypeScript would normally stop
+    expect(planLogUpdate(animeLog(), { status: "binged", progress: 1, progressUnit: "episode" }, TODAY).ok).toBe(false);
+  });
+
+  it("tracks game hours and never auto-finishes on hours", () => {
+    const game = animeLog({
+      progress: null,
+      progress_unit: null,
+      media: { ...animeLog().media, type: "game", source: "igdb", total_units: null },
+    });
+    const result = planLogUpdate(game, { status: "in_progress", progress: 120, progressUnit: "hour" }, TODAY);
+    expect(result.ok && result.value).toMatchObject({ status: "in_progress", progress: 120, progress_unit: "hour" });
   });
 });

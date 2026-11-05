@@ -7,6 +7,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { ratingToStars, statusLabel, TYPE_LABELS, unitsLabel } from "@/lib/media/display";
+import { mediaItemPath } from "@/lib/media/links";
 import type { LogWithMedia, MediaResult } from "@/lib/media";
 import { SEARCH_FILTERS, type SearchFilter, type SourceStatus, type UnifiedSearchResponse } from "@/lib/sources/types";
 import { useAuth } from "./AuthProvider";
@@ -189,6 +190,10 @@ export function MediaSearch() {
           <p className="mt-6 rounded-md border border-emerald-500/40 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
             Logged <strong>{saved.media.title}</strong> as &ldquo;{statusLabel(saved.status, saved.media.type)}&rdquo;
             {saved.rating !== null && ` ${ratingToStars(saved.rating)}`}.{" "}
+            <Link href={mediaItemPath(saved.media)} className="font-medium underline">
+              Open its page
+            </Link>
+            {profile && " · "}
             {profile && (
               <Link href={`/u/${profile.username}`} className="font-medium underline">
                 See it on your profile

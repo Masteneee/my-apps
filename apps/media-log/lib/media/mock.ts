@@ -7,7 +7,7 @@
 
 import type { KeyValueStorage } from "../auth/mock";
 import type { Log, LogWithMedia, MediaItem, MediaStore, NewLogInput } from "./types";
-import { localToday, mediaItemFields, validateLogInput } from "./validation";
+import { localToday, mediaItemFields, planLogUpdate, validateLogInput } from "./validation";
 
 export const MOCK_MEDIA_STORAGE_KEY = "media-log:mock-media";
 
@@ -40,7 +40,10 @@ export function createMockMediaStore({
     try {
       const parsed = JSON.parse(raw) as Partial<MockMediaDatabase>;
       // `?? []` in case an older or hand-edited save is missing a part.
-      return { mediaItems: parsed.mediaItems ?? [], logs: parsed.logs ?? [] };
+      // Logs saved before Stage 4 have no `progress_unit`: give them null, like
+      // the database does for old rows when the new column is added.
+      const logs = (parsed.logs ?? []).map((log) => ({ ...log, progress_unit: log.progress_unit ?? null }));
+      return { mediaItems: parsed.mediaItems ?? [], logs };
     } catch {
       // Corrupted data: start over instead of crashing (same as the demo auth).
       return emptyDatabase();
@@ -55,6 +58,21 @@ export function createMockMediaStore({
   function withMedia(db: MockMediaDatabase, log: Log): LogWithMedia | null {
     const media = db.mediaItems.find((item) => item.id === log.media_item_id);
     return media ? { ...log, media } : null;
+  }
+
+  // Newest first, with media attached, skipping logs whose item is missing
+  // (only possible with hand-edited data).
+  function newestFirstWithMedia(db: MockMediaDatabase, logs: Log[]): LogWithMedia[] {
+    return (
+      [...logs]
+        // New logs are pushed at the end, so reversing puts the newest first.
+        // The sort then fixes any order problems; for equal times it keeps
+        // the reversed order (JavaScript's sort is "stable").
+        .reverse()
+        .sort((a, b) => b.created_at.localeCompare(a.created_at))
+        .map((log) => withMedia(db, log))
+        .filter((log): log is LogWithMedia => log !== null)
+    );
   }
 
   return {
@@ -86,7 +104,6 @@ export function createMockMediaStore({
         user_id: userId,
         media_item_id: media.id,
         ...checked.value,
-        progress: null,
         started_at: null,
         created_at: now().toISOString(),
       };
@@ -97,18 +114,38 @@ export function createMockMediaStore({
 
     async getLogsForUser(userId) {
       const db = load();
-      return (
-        db.logs
-          .filter((log) => log.user_id === userId)
-          // New logs are pushed at the end, so reversing puts the newest first.
-          // The sort then fixes any order problems; for equal times it keeps
-          // the reversed order (JavaScript's sort is "stable").
-          .reverse()
-          .sort((a, b) => b.created_at.localeCompare(a.created_at))
-          .map((log) => withMedia(db, log))
-          // Skip logs whose item is missing (only possible with hand-edited data).
-          .filter((log): log is LogWithMedia => log !== null)
-      );
+      return newestFirstWithMedia(db, db.logs.filter((log) => log.user_id === userId));
+    },
+
+    async getMediaItem({ type, source, sourceId }) {
+      const db = load();
+      return db.mediaItems.find((item) => item.type === type && item.source === source && item.source_id === sourceId) ?? null;
+    },
+
+    async getLogsForItem(mediaItemId) {
+      // Everyone's logs: in demo mode "everyone" = every demo account made in this browser.
+      const db = load();
+      return newestFirstWithMedia(db, db.logs.filter((log) => log.media_item_id === mediaItemId));
+    },
+
+    async updateLog(logId, change) {
+      const userId = await getCurrentUserId();
+      if (!userId) throw new Error("You need to be logged in to change a log.");
+
+      const db = load();
+      const index = db.logs.findIndex((log) => log.id === logId);
+      const current = index === -1 ? null : withMedia(db, db.logs[index]);
+      if (!current) throw new Error("That log doesn't exist anymore. Reload the page.");
+      // Mirrors the RLS rule "Users can update their own logs".
+      if (current.user_id !== userId) throw new Error("You can only change your own logs.");
+
+      const planned = planLogUpdate(current, change, localToday(now()));
+      if (!planned.ok) throw new Error(planned.error);
+
+      const updated: Log = { ...db.logs[index], ...planned.value };
+      db.logs[index] = updated;
+      save(db);
+      return { ...updated, media: current.media };
     },
   };
 }

@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  averageRating,
   countByType,
+  formatAverage,
+  logProgressLabel,
   groupByType,
   latestLogPerItem,
   ratingToStars,
@@ -21,6 +24,7 @@ function log(id: string, mediaId: string, type: MediaType = "movie"): LogWithMed
     status: "completed",
     rating: null,
     progress: null,
+    progress_unit: null,
     review_text: null,
     started_at: null,
     finished_at: null,
@@ -112,6 +116,61 @@ describe("friendlyMediaError", () => {
       "your own logs",
     );
     expect(friendlyMediaError({ code: "PGRST205", message: "Could not find the table" })).toContain("migration");
+    expect(friendlyMediaError({ code: "PGRST204", message: "Could not find the 'progress_unit' column" })).toContain(
+      "Stage 4",
+    );
     expect(friendlyMediaError({ code: "something_new", message: "Original text" })).toBe("Original text");
+  });
+});
+
+describe("averageRating (everyone's average on the item page)", () => {
+  // Newest first, like getLogsForItem returns them.
+  const rated = (id: string, userId: string, rating: number | null): LogWithMedia => ({
+    ...log(id, "dune"),
+    user_id: userId,
+    rating,
+  });
+
+  it("is empty when nobody rated it", () => {
+    expect(averageRating([])).toEqual({ average: null, count: 0 });
+    expect(averageRating([rated("l1", "ana", null)])).toEqual({ average: null, count: 0 });
+  });
+
+  it("averages one rating per person", () => {
+    const logs = [rated("l3", "ana", 4), rated("l2", "ben", 3), rated("l1", "carl", 5)];
+    expect(averageRating(logs)).toEqual({ average: 4, count: 3 });
+  });
+
+  it("uses each person's most recent rating, and skips their unrated logs", () => {
+    const logs = [
+      rated("l4", "ana", null), // Ana's rewatch in progress: not rated yet
+      rated("l3", "ana", 5), // her latest rating: counts
+      rated("l2", "ben", 2),
+      rated("l1", "ana", 1), // her old rating: ignored
+    ];
+    expect(averageRating(logs)).toEqual({ average: 3.5, count: 2 });
+  });
+
+  it("shows one decimal", () => {
+    expect(formatAverage(23 / 6)).toBe("3.8");
+    expect(formatAverage(4)).toBe("4.0");
+  });
+});
+
+describe("logProgressLabel", () => {
+  it("shows the progress of a log, with the item's total", () => {
+    const watching: LogWithMedia = {
+      ...log("l1", "frieren", "anime"),
+      status: "in_progress",
+      progress: 7,
+      progress_unit: "episode",
+    };
+    watching.media = { ...watching.media, total_units: 28 };
+    expect(logProgressLabel(watching)).toBe("Episode 7/28");
+  });
+
+  it("shows nothing without progress or for 'Want to watch'", () => {
+    expect(logProgressLabel(log("l1", "dune"))).toBeNull();
+    expect(logProgressLabel({ ...log("l1", "x", "anime"), status: "planned", progress: 3, progress_unit: "episode" })).toBeNull();
   });
 });

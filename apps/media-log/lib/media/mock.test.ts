@@ -150,3 +150,96 @@ describe("demo media store: reading logs", () => {
     expect(storage.getItem("media-log:mock-db")).toBeNull();
   });
 });
+
+// ---------------------------------------------------------------------------
+// Stage 4: item page + progress tracker
+// ---------------------------------------------------------------------------
+const frieren: MediaResult = {
+  ...result("154587", "Frieren"),
+  type: "anime",
+  source: "anilist",
+  year: 2023,
+  totalUnits: 28,
+};
+
+describe("demo media store: item page", () => {
+  it("finds the cached item by type, source and source id", async () => {
+    const log = await store.addLog(logOf(frieren, { status: "in_progress", rating: null, progress: 3 }));
+    expect(await store.getMediaItem({ type: "anime", source: "anilist", sourceId: "154587" })).toEqual(log.media);
+    // Same id but another type or source: a different item, never logged.
+    expect(await store.getMediaItem({ type: "manga", source: "anilist", sourceId: "154587" })).toBeNull();
+    expect(await store.getMediaItem({ type: "anime", source: "tmdb", sourceId: "154587" })).toBeNull();
+  });
+
+  it("returns everyone's logs of an item, newest first, and nothing else", async () => {
+    const mine = await store.addLog(logOf(interstellar, { rating: 4 }));
+    await store.addLog(logOf(parasite));
+    currentUser = "user-2";
+    await store.addLog(logOf(interstellar, { rating: 5 }));
+
+    const logs = await store.getLogsForItem(mine.media.id);
+    expect(logs.map((l) => [l.user_id, l.rating])).toEqual([
+      ["user-2", 5],
+      ["user-1", 4],
+    ]);
+    expect(await store.getLogsForItem("no-such-item")).toEqual([]);
+  });
+
+  it("saves progress from the log form", async () => {
+    const log = await store.addLog(logOf(frieren, { status: "in_progress", rating: null, progress: 7 }));
+    expect(log).toMatchObject({ progress: 7, progress_unit: "episode" });
+  });
+
+  it("reads logs saved before Stage 4 (no progress_unit) as 'no unit'", async () => {
+    await store.addLog(logOf(interstellar));
+    const saved = JSON.parse(storage.getItem(MOCK_MEDIA_STORAGE_KEY)!);
+    delete saved.logs[0].progress_unit; // what an older save looks like
+    storage.setItem(MOCK_MEDIA_STORAGE_KEY, JSON.stringify(saved));
+    const [log] = await store.getLogsForUser("user-1");
+    expect(log.progress_unit).toBeNull();
+  });
+});
+
+describe("demo media store: updating progress", () => {
+  it("updates your own log and keeps it after a reload", async () => {
+    const log = await store.addLog(logOf(frieren, { status: "in_progress", rating: null, progress: 7 }));
+    const updated = await store.updateLog(log.id, { status: "in_progress", progress: 8, progressUnit: "episode" });
+    expect(updated).toMatchObject({ id: log.id, progress: 8, media: { title: "Frieren" } });
+
+    const [afterReload] = await makeStore().getLogsForUser("user-1");
+    expect(afterReload.progress).toBe(8);
+  });
+
+  it("finishes the log (today, local time) at the last episode", async () => {
+    const log = await store.addLog(logOf(frieren, { status: "in_progress", rating: null, progress: 27 }));
+    const updated = await store.updateLog(log.id, { status: "in_progress", progress: 28, progressUnit: "episode" });
+    expect(updated.status).toBe("completed");
+    // The test clock says Nov 5 2026 at 12:0x UTC, the same day in every time zone near Quebec.
+    expect(updated.finished_at).toBe("2026-11-05");
+  });
+
+  it("refuses to change someone else's log, or when logged out", async () => {
+    const log = await store.addLog(logOf(frieren, { status: "in_progress", rating: null, progress: 1 }));
+    currentUser = "user-2";
+    await expect(store.updateLog(log.id, { status: "in_progress", progress: 2, progressUnit: null })).rejects.toThrow(
+      "your own logs",
+    );
+    currentUser = null;
+    await expect(store.updateLog(log.id, { status: "in_progress", progress: 2, progressUnit: null })).rejects.toThrow(
+      "logged in",
+    );
+    currentUser = "user-1";
+    expect((await store.getLogsForUser("user-1"))[0].progress).toBe(1);
+  });
+
+  it("refuses bad values and a missing log, and saves nothing", async () => {
+    const log = await store.addLog(logOf(frieren, { status: "in_progress", rating: null, progress: 1 }));
+    await expect(store.updateLog(log.id, { status: "in_progress", progress: 29, progressUnit: "episode" })).rejects.toThrow(
+      "only has 28 episodes",
+    );
+    await expect(store.updateLog("nope", { status: "in_progress", progress: 2, progressUnit: null })).rejects.toThrow(
+      "doesn't exist",
+    );
+    expect((await store.getLogsForUser("user-1"))[0].progress).toBe(1);
+  });
+});

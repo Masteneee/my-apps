@@ -522,3 +522,178 @@ Answers
    other source's results. Caught errors become a status line instead.
 3. The secret is only sent to Twitch to get a temporary token. IGDB receives the client id and that token.
    If the token leaked, it would expire; the secret would not.
+
+## Stage 4: Tracking + diary (2026-11-05)
+
+### What we built
+- **Progress tracking.** A log can now say how far you are: "Episode 7/24" (series, anime), "Chapter 120/?"
+  (manga, total unknown), "Page 270/604 (44%)" or "45%" (books, your choice), "12.5 hours" (games). Movies
+  have none. The log form has a progress box when it makes sense, and posters show it while you're in the
+  middle of something.
+- **Item page** `/media/<type>/<source>-<id>` (e.g. `/media/anime/anilist-16498`): cover, info, everyone's
+  average rating, and **My log** with a progress tracker: a quick **+1 ep** button (saved right away), a
+  status menu and a progress box. Reaching the last episode marks it "Watched" by itself. **Log it again**
+  adds a new diary entry (older ones move under "Earlier").
+- **Diary** `/u/<username>/diary`: every log as a timeline grouped by month, newest first. A log goes on the
+  day you finished it ("Watched on"), or else the day you logged it.
+- Everything works in demo mode (localStorage) AND with Supabase, through the same `MediaStore` interface.
+
+### The plan we followed
+1. Add `progress_unit` to the `Log` type and three store methods: `getMediaItem`, `getLogsForItem`, `updateLog`.
+2. Write the progress math as pure functions (`lib/media/progress.ts`), plus `planLogUpdate` (the tracker's rules).
+3. Write the diary grouping (`diary.ts`), the average rating (`display.ts`) and the item URLs (`links.ts`).
+4. Implement the three methods in both stores, and add a NEW migration for the database.
+5. Build the pages: progress box in the form, the tracker, the item page, the diary, links from posters.
+6. Tests for every rule, then click through the whole thing in a real (headless) browser in demo mode.
+
+### New concepts
+
+**Storing a number AND its unit.** `progress = 45` means nothing alone: 45 pages? 45%? So a log stores two
+columns, `progress` and `progress_unit`. We can't guess the unit from the type, because a book can be
+tracked in pages (paper) or percent (e-reader). The total (24 episodes) is NOT copied onto the log: it
+already lives on the item (`total_units`), and copying it would mean two places that can disagree.
+
+**Migrations only move forward.** We changed the database by adding a new file
+(`20261105020000_progress_units.sql`) instead of editing the Stage 2 one. A database that already ran Stage
+2 never re-reads that file, so edits there would silently never happen. `alter table ... add column` adds
+the unit, and `alter column progress type numeric using progress::numeric` changes whole numbers into
+numbers with decimals (for 12.5 hours), telling Postgres how to convert the existing values.
+
+**Checks across columns (and their limits).** A `check` can compare columns of the SAME row: "progress and
+progress_unit are both set or both empty", "percent is at most 100", "only hours may have a decimal". But it
+can't look at another table, so "episode 30 of a 24-episode anime" is checked by the app
+(`validateProgress`), not the database. Knowing which layer can enforce which rule is a big part of design.
+
+**Floats aren't exact.** Computers store decimals in binary, so `0.1 + 0.2` is `0.30000000000000004`. For
+hours we round to one decimal (`Math.round(x * 10) / 10`) instead of refusing the value. For percentages we
+use `Math.floor`, so 23/24 shows 95% and only 24/24 shows 100% (rounding would show "100%" too early).
+
+**Derived data: compute it, don't store it.** "Everyone's average rating" is not a column: `averageRating()`
+works it out from the logs each time. Nothing can go out of date. Each PERSON counts once with their most
+recent rating (a `Map` from user id to rating), otherwise someone who logs a movie ten times would count ten
+times. Later, with thousands of logs, the database could do this sum for us (see Decisions).
+
+**Time zones and "which day is it?".** `created_at` is stored in UTC (`2026-11-05T02:30:00Z`). In Montreal
+that's still Nov 4, 9:30 pm. `diaryDate()` turns it into YOUR calendar day with `localToday()`, so the diary
+doesn't put evening logs on the next day. The tests use times at noon UTC, which is the same date in every
+time zone from UTC-11 to UTC+11, so they pass on any computer.
+
+**Grouping sorted data in one pass.** `groupDiaryByMonth` first sorts the entries newest first. Then a single
+loop only has to ask "is this the same month as the previous one?": if yes, add it to the last group;
+if not, start a new group. "YYYY-MM-DD" text sorts like dates, so `localeCompare` is enough.
+
+**Two dynamic segments, and `notFound()`.** The folder `app/media/[type]/[id]/` catches `/media/anime/anilist-16498`
+and Next.js gives both parts in `params`. `parseMediaItemParams` checks them (known type? known source?);
+if the address is wrong, `notFound()` stops the page and shows `app/not-found.tsx`. The diary is a
+**nested** route: `app/u/[username]/diary/` adds `/diary` after a profile.
+
+**Custom hooks.** The profile and the diary both need "this username's profile and logs". Instead of copying
+the loading code, it moved into `useProfileLogs()` (`components/useProfileLogs.ts`). A hook is just a
+function whose name starts with `use` and that uses other hooks (`useState`, `useEffect`) inside.
+
+**Resetting a component with `key`.** The tracker copies the saved log into its own state when it starts.
+`<ProgressTracker key={current.id} ...>` tells React "a different id = a different tracker": when you log
+something again, the old tracker is thrown away and a fresh one starts from the new log, instead of keeping
+stale numbers.
+
+**A text box for a number.** The progress box keeps its value as TEXT (`"7"`, or `""` for empty).
+`parseProgressText()` turns `""` into `null` (no progress), `"12,5"` into 12.5, and junk into `NaN`, which
+`validateProgress` refuses with a clear sentence. Storing a number directly would make "empty" impossible.
+
+**Debugging with a theory (rule 9).** Clicking through the app showed a bug: a finished, rated game set to
+"Want to play" became "Playing" instead of showing the "can't rate" error. Theory: the rule "Want to play +
+progress = Playing" fired because the box was pre-filled with the saved 60.5 hours, before the rating check.
+Evidence: two new tests reproducing it failed. Fix (root cause): the automatic status changes now only happen
+when you CHANGE the progress. Both tests pass, and the same fix lets you set a 25/25 anime back to "Watching".
+
+### New dependencies
+None. (The browser click-through used the Chrome already on the machine, driven by a throwaway script that
+is not part of the app.)
+
+### Files and what each one does
+- `lib/media/progress.ts` (new) units per type, `validateProgress`, `formatProgress` ("Episode 7/24"),
+  `progressPercent`, the "+" button (`progressStep`, `stepLabel`, `incrementProgress`), `reachedEnd`,
+  `parseProgressText`, `progressFieldLabel`. Tests: `progress.test.ts`.
+- `lib/media/diary.ts` (new) `diaryDate`, `monthLabel`, `formatShortDate`, `groupDiaryByMonth`. Tests: `diary.test.ts`.
+- `lib/media/links.ts` (new) `mediaItemPath` and `parseMediaItemParams` for `/media/[type]/[id]`. Tests: `links.test.ts`.
+- `lib/media/types.ts` `PROGRESS_UNITS`, `progress_unit` on `Log`, optional progress on `NewLogInput`,
+  `LogUpdateInput`, `MediaItemRef`, and the 3 new `MediaStore` methods.
+- `lib/media/validation.ts` progress in `validateLogInput`, `planLogUpdate` (the tracker's rules), `mediaItemToResult`.
+- `lib/media/display.ts` `logProgressLabel`, `averageRating`, `formatAverage`.
+- `lib/media/mock.ts` and `lib/media/supabase.ts` `getMediaItem`, `getLogsForItem`, `updateLog` (both
+  stores); the demo store reads pre-Stage-4 saves; Supabase converts `numeric` progress and explains a
+  missing Stage 4 migration.
+- `supabase/migrations/20261105020000_progress_units.sql` (new) `progress_unit`, `progress` as numeric, checks.
+- `app/media/[type]/[id]/page.tsx` (new) checks the address, then shows `MediaItemView`.
+- `app/u/[username]/diary/page.tsx` (new) shows `DiaryView`.
+- `components/MediaItemView.tsx` (new) the item page. `components/ProgressTracker.tsx` (new) status, box, "+1".
+  `components/ProgressField.tsx` (new) the progress box (used by the form and the tracker).
+  `components/ProgressBar.tsx` (new) the bar. `components/DiaryView.tsx` (new) the diary.
+  `components/useProfileLogs.ts` (new) the shared loading hook.
+- `components/LogMediaForm.tsx` progress box, `cancelLabel`. `components/ProfileView.tsx` uses the hook,
+  links to the diary. `components/PosterGrid.tsx` posters link to item pages and show progress.
+  `components/MediaSearch.tsx` "Open its page" link after logging.
+- Tests updated: `display.test.ts`, `validation.test.ts`, `mock.test.ts`.
+
+Tests: 259 in 17 files (185 in 14 before this stage).
+
+### Most important lines
+```ts
+const progressChanged = progress !== log.progress || progress_unit !== log.progress_unit;
+```
+In `planLogUpdate` (`lib/media/validation.ts`): the bug fix. Automatic status changes only happen when you
+actually moved the progress, not just because the box still shows the saved number.
+
+```ts
+if (log.rating === null || latestByUser.has(log.user_id)) continue;
+```
+In `averageRating` (`lib/media/display.ts`): logs come newest first, so the FIRST rating we meet per person
+is their latest, and every later one is skipped. One person, one vote.
+
+```ts
+return log.finished_at ?? localToday(new Date(log.created_at));
+```
+In `diaryDate` (`lib/media/diary.ts`): the date you gave wins; otherwise the day YOU logged it, in your time zone.
+
+### Decisions
+- **Item URLs use the source's id** (`anilist-16498`), not our database id: it's the same in demo mode and
+  Supabase, so links can be shared, and it matches the database's unique rule.
+- **The item page only shows items someone has logged** (the cached copy). Adapters can only search, not look
+  up one id, and PLAN.md says not to copy catalogs. Others show "Not in Media Log yet" with a search link.
+- **Progress past the total is refused** (episode 30 of 24): it catches typos. Downside: a cached total can
+  be out of date (a running series gains episodes). Refreshing old cached items is for later (Stage 7 cache work).
+- **Movies have no progress**, books use pages OR percent, games use hours with one decimal.
+- **Auto status only in the tracker, only when the progress changes**: "Want to watch" + progress -> Watching,
+  the last episode or 100% -> Watched (dated today). Dropped and Paused are never changed for you. The log form
+  never changes the status you picked.
+- **The log form asks for progress only while it's unfinished** (Watching/Paused/Dropped), and for games also
+  when finished ("hours played"). A finished series doesn't need "24/24" typed in.
+- **The average is computed in the browser from all logs of the item.** Fine for a hobby app; with thousands
+  of logs per item we'd ask Postgres for it (a view or function using `avg()`).
+- **`started_at` is still unused**: the diary uses the finished date or the logging day.
+- **Logs saved in demo mode before Stage 4 still load** (no `progress_unit` = no unit).
+- **With Supabase, the Stage 4 migration is required**: until it runs, saving says "Run the Stage 4
+  migration". Not tested against a real Supabase project (no internet here); demo mode was clicked through
+  in a headless browser.
+
+### Practice exercise
+Add a **"−1"** button to undo a wrong "+1". In `lib/media/progress.ts`, write
+`decrementProgress(progress, unit)`: one step less (`progressStep(unit)`), never below 0, and for hours
+rounded to one decimal like `incrementProgress`. Add tests in `progress.test.ts` (7 episodes -> 6, 0 -> 0,
+5 pages -> 0, 12.5 hours -> 11.5). Then in `components/ProgressTracker.tsx`, add a button next to "+1 ep" that
+calls `save({ status: log.status, progress: decrementProgress(...), progressUnit: savedUnit })`, shown only
+when the progress is above 0. Run `npm test`, then try it on an item page. Bonus: what does `planLogUpdate` do
+with the status when you go from 25/25 (Watched) down to 24? Is that what you'd want?
+
+### Quiz
+1. Why does `progress_unit` exist, when the media type already tells us "anime = episodes"?
+2. Why can't the database itself refuse "episode 30" for a 24-episode anime?
+3. Ana rated Dune 2, then 5 on a reread; Ben rated it 3. What does the item page show, and why not 3.3?
+
+Answers
+1. Books can be tracked in two ways (pages or percent), so the type alone isn't enough. Storing the unit also
+   makes each log self-explaining: `45` + `percent` can't be misread as 45 pages.
+2. A `check` constraint only sees the row being saved, and the total lives in another table (`media_items`).
+   The app checks it in `validateProgress` (a database "trigger" could, but that's more advanced).
+3. "★ 4.0 average from 2 ratings": each person counts once with their LATEST rating, so (5 + 3) / 2 = 4.
+   3.3 would be (2 + 5 + 3) / 3, counting Ana twice.

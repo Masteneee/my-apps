@@ -1,6 +1,7 @@
 // Small pure helpers that turn stored data into what the pages show.
 // No React here, so they're easy to test (display.test.ts).
 
+import { formatProgress } from "./progress";
 import { MEDIA_TYPES, type LogStatus, type LogWithMedia, type MediaType } from "./types";
 
 /** 3.5 -> "★★★½". Null (not rated) -> "". */
@@ -114,4 +115,42 @@ export function groupByType(logs: LogWithMedia[]): { type: MediaType; logs: LogW
   return MEDIA_TYPES.map((type) => ({ type, logs: logs.filter((log) => log.media.type === type) })).filter(
     (group) => group.logs.length > 0,
   );
+}
+
+/**
+ * The progress of a log as text ("Episode 7/24", "45%", "12.5 hours"), or null
+ * when there's nothing to show (no progress, or still "Want to watch").
+ */
+export function logProgressLabel(log: LogWithMedia): string | null {
+  if (log.status === "planned") return null;
+  return formatProgress(log.progress, log.progress_unit, log.media.total_units);
+}
+
+export type AverageRating = {
+  average: number | null; // null when nobody rated it
+  count: number; // how many PEOPLE rated it
+};
+
+/**
+ * "Everyone's average rating" on an item page.
+ * Each person counts ONCE, with their most recent rating: if you rated a movie 3
+ * and then 4.5 on a rewatch, your 4.5 counts and your 3 doesn't. Otherwise
+ * someone who logs a movie ten times would weigh ten times more.
+ * Expects `logs` newest first (that's what getLogsForItem returns).
+ */
+export function averageRating(logs: LogWithMedia[]): AverageRating {
+  const latestByUser = new Map<string, number>();
+  for (const log of logs) {
+    if (log.rating === null || latestByUser.has(log.user_id)) continue;
+    latestByUser.set(log.user_id, log.rating);
+  }
+  const ratings = [...latestByUser.values()];
+  if (ratings.length === 0) return { average: null, count: 0 };
+  const sum = ratings.reduce((total, rating) => total + rating, 0);
+  return { average: sum / ratings.length, count: ratings.length };
+}
+
+/** 3.8333 -> "3.8", 4 -> "4.0" (always one decimal, so averages line up). */
+export function formatAverage(average: number): string {
+  return average.toFixed(1);
 }
