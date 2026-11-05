@@ -4,9 +4,25 @@ A calm, minimal daily check-in (about 5 minutes): mood, screen time, gratitude, 
 habits, with per-habit streaks and shared streaks with a friend. It's a PWA: you can install it on your
 phone from the browser, and it opens with no connection.
 
-**Status:** Stage 4 of 5 done (accounts + PWA, the daily check-in, streaks + calendar +
-breathing, then friends + shared streaks). Insights and shipping come in Stage 5. See [PLAN.md](PLAN.md) for all stages and [LEARNING.md](LEARNING.md) for what each
-stage taught.
+**Status:** all 5 stages done (accounts + PWA, the daily check-in, streaks + calendar + breathing,
+friends + shared streaks, then insights + export + ship prep). Runs fully in **demo mode** (no keys, data
+in your browser) and is ready to deploy on Vercel with Supabase (see [Deploy to Vercel](#deploy-to-vercel)).
+See [PLAN.md](PLAN.md) for all stages, [LEARNING.md](LEARNING.md) for what each stage taught and
+[PRIVACY.md](PRIVACY.md) for the privacy note.
+
+## The gap
+Daylio does mood, Streaks does habits, Finch is gamified, Headspace does meditation. Few combine all of
+them in one quick check-in, and shared friend streaks (the Snapchat mechanic, used for good) are rare in
+wellbeing apps.
+
+## Screenshots
+Taken in demo mode on a phone-sized screen, with made-up history for a demo person, Ama.
+
+| Home | The check-in |
+|---|---|
+| ![Home: today's check-in done, streaks, this week's average mood](docs/screenshots/1-home.png) | ![Check-in, step 1: pick a mood and a few words](docs/screenshots/2-checkin.png) |
+| **This week** | **Habits and mood** |
+| ![Weekly summary: average mood 3.3, lower than last week, and 8 weeks of averages](docs/screenshots/3-insights.png) | ![Average mood on days each habit was done vs not done, with the number of days](docs/screenshots/4-habits-and-mood.png) |
 
 ## What works now
 - Sign up / log in with email and password (Google login once Supabase is set up).
@@ -30,9 +46,16 @@ stage taught.
   making a new yes/no habit with the same name). The streak only goes up on days you **both** did it.
 - **The nudge**: when your friend did a shared habit today and you haven't yet, the home page and
   `/friends` say "Sam checked in for Stretch. Your turn!" (in the app only, no notifications).
+- **Weekly insights** (`/insights`): your average mood this week vs last week, 8 weeks of averages, and
+  for each habit the average mood on days you did it vs days you didn't (with how many days are behind
+  each number). Simple averages, explained honestly (see "How insights work" below).
+- **Export my data** (Profile > Your data): download everything you saved as **JSON** (a full backup)
+  or **CSV** (one row per day, opens in Excel or Google Sheets). Journal included: it's yours.
+- **Privacy note** (`/privacy`, and [PRIVACY.md](PRIVACY.md)): what's stored, who sees what, how to export
+  and delete.
 - "Today" is the date on your phone's clock, in its time zone (America/Toronto if it can't tell).
 - Install it on a phone or computer (web app manifest + icons).
-- Offline: the check-in, habits, streaks, breathing and friends pages open without a connection (the service worker saves them in
+- Offline: the check-in, habits, streaks, insights, breathing, friends and privacy pages open without a connection (the service worker saves them in
   advance). In demo mode the check-in fully works offline. In Supabase mode, answers saved offline
   are kept on the device and sent when you're back online ("Saved on this device, will sync").
   Streaks need your history, so in Supabase mode they load once you're back online (in demo mode
@@ -56,6 +79,33 @@ stage taught.
   days (separate from your personal ones); one such day between two both-done days is covered.
 - Counts are never stored: they're worked out from both people's days each time
   (`lib/friends/shared-streaks.ts`).
+
+## How insights work
+- **Only days with a mood count.** A day you checked in without picking a mood is left out, not counted
+  as a bad day.
+- **Weeks run Monday to Sunday**, on your phone's local dates (America/Toronto by default), like streaks.
+- **This week vs last week:** each week needs a mood on at least 3 days, or the app says "not enough
+  days to compare yet". A change under 0.3 (on the 1 to 5 scale) is "about the same".
+- **Habits and mood:** the last 4 weeks, **without today** (it isn't over, and most people pick a mood
+  before ticking habits). For each habit: average mood on days you did it vs days you didn't, counted from
+  the day you added the habit. A habit with a daily goal counts as done when you reach the goal.
+- **Nothing is shown until there are 4 days on each side** (done and not done). Differences under 0.3
+  are "about the same".
+- **Correlation, not cause.** "Higher on days you walked" doesn't mean walking caused it: maybe you only
+  walk on days you already feel good. The page says so.
+- All of it is in `lib/insights.ts`, with tests (`lib/insights.test.ts`). The page only loads the date and
+  mood of your check-ins, never the journal.
+
+## Export my data
+Profile > Your data > **Download JSON** or **Download CSV**. The file is made in your browser (nothing is
+uploaded) by `lib/export.ts` (tested in `lib/export.test.ts`):
+- **JSON:** `{ app, format_version, exported_at, time_zone, account, habits, checkins, habit_entries }`,
+  exactly as stored. Every `date` is a local day in `time_zone`.
+- **CSV:** one row per day (`date, mood, mood_word, mood_tags, screen_time_minutes, gratitude_1..3,
+  journal`, then one column per habit: `yes` or the amount, empty = not done). It starts with a UTF-8
+  "BOM" so Excel shows accents and emoji correctly.
+- Only your own rows. Friends and shared streaks are left out (they involve another person).
+- In Supabase mode the export needs the internet (your history is on the server).
 
 ## Run it
 
@@ -141,6 +191,28 @@ everything and already did shared habits on most of the last 2 weeks, today incl
    habit, Accept. To see Sam's side, log in as `sam@demo.local` / `demo-friend`.
 8. Remove a friend: their shared streaks disappear too.
 
+## Test insights and export by hand (demo mode is fine)
+Insights need a few weeks of history. The quickest way is the same trick as for streaks:
+1. `npm run dev`, sign up, add habits "Walk" (Yes / no) and "Water" (A count, goal 8). Do today's
+   check-in: pick a mood, tick Walk.
+2. Open `/insights` (home > Streaks card > "Weekly insights"): "This week" shows today's mood, "Not enough
+   days to compare yet ... (this week 1, last week 0)", and under Habits and mood: "Not enough days yet ...
+   (now 0 and 0)" for both habits (today isn't counted).
+3. DevTools > Application > Local storage > `wellbeing-app:mock-checkins`. In `checkins`, copy your
+   check-in 8 times with `date` set to 1 to 8 days ago and `mood` 5, 5, 5, 5, 2, 2, 2, 2 (and different
+   `id`s). In `habitEntries`, copy your Walk entry for the 4 days with mood 5. Also set Walk's
+   `created_at` in `habits` to 10 days ago. Reload `/insights`: Walk shows "Your mood was higher on days
+   you did Walk", 5.0 · 4 days vs 2.0 · 4 days. Water still says "(now 0 and 0)": it was added today,
+   and days before a habit existed don't count as "not done".
+4. Delete one of the Walk entries and reload: 3 done days, so Walk moves to "Needs more days (now 3 and 5)".
+5. If the 8 days cover this week and last week with 3+ moods each, the top card says "Higher" or "Lower
+   than last week". Days without a mood (`"mood": null`) are not counted anywhere.
+6. Export: `/profile` > Your data > **Download JSON**: the file has your habits, check-ins (journal
+   included) and habit entries. **Download CSV** and open it in a spreadsheet: one row per day, a Walk
+   and a Water column. Write a journal with a comma, quotes and a new line first: it stays in one cell.
+7. Log in as a second demo account and export: none of the first account's days are in it.
+8. `/privacy` opens from the profile's "Privacy" link and from the welcome page.
+
 ## Test the PWA by hand
 The service worker only runs in a production build (in `npm run dev` it is switched off on purpose,
 see LEARNING.md).
@@ -153,7 +225,7 @@ npm start          # http://localhost:3001
 1. Open http://localhost:3001 in Chrome. Sign up, pick a username.
 2. DevTools (F12) > Application > Manifest: no errors, icons shown. Service workers: `sw.js` is
    "activated and is running". Cache storage: `wellbeing-pages-v1` (with `/checkin`, `/habits`,
-   `/streaks`, `/breathe` and `/friends` in it) and `wellbeing-static-v1`.
+   `/streaks`, `/breathe`, `/friends`, `/insights` and `/privacy` in it) and `wellbeing-static-v1`.
 3. DevTools > Network > set "No throttling" to **Offline**. Reload: the home page still opens with
    your name. Go to `/checkin`, `/profile`, `/streaks` and `/breathe`: they work. Go to `/abc`:
    "You're offline".
@@ -163,23 +235,53 @@ npm start          # http://localhost:3001
 
 To start fresh: DevTools > Application > Storage > "Clear site data".
 
+## Deploy to Vercel
+Not deployed yet. Nothing to configure in code: Vercel recognises Next.js by itself (no `vercel.json`).
+Do the "Real accounts (Supabase)" steps above first (all 3 migrations).
+
+1. Push the repo to GitHub. On vercel.com (free Hobby plan, log in with GitHub): **Add New > Project**,
+   import `my-apps`.
+2. **Root Directory:** `apps/wellbeing-app` (the repo holds several apps). Framework: Next.js (detected).
+   Leave the build and install commands as they are.
+3. **Environment Variables** (Production, and Preview if you want preview links to work too):
+
+   | Name | Value |
+   |------|-------|
+   | `NEXT_PUBLIC_SUPABASE_URL` | Supabase > Project Settings > API > Project URL |
+   | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | the anon / publishable key (never `service_role`) |
+
+   Without them the deployed site runs in demo mode (data in each visitor's browser), which is also a fine
+   public demo. `NEXT_PUBLIC_` values are copied into the browser code **at build time**: after changing
+   them, redeploy (Deployments > ⋯ > Redeploy).
+4. **Deploy.** You get a URL like `https://wellbeing-app-xyz.vercel.app`. Vercel serves it over **HTTPS**,
+   which phones require to install a PWA and run its service worker (only `localhost` is allowed without it).
+5. In Supabase, Authentication > URL Configuration: set **Site URL** to that URL and add
+   `<that URL>/onboarding` to **Redirect URLs** (keep the `http://localhost:3001` ones for development).
+   Without this, confirmation emails and Google login send people back to localhost.
+6. Google login (optional): nothing changes in Google Cloud (its redirect URI is the Supabase one).
+7. Check: open the URL, no demo strip; sign up, confirm, pick a username, do a check-in. On a phone:
+   Chrome ⋮ > Install app, or Safari Share > Add to Home Screen. Then turn on airplane mode and open it.
+
+Every push to GitHub then redeploys by itself (GitHub Actions keeps checking lint, tests and build).
+
 ## Scripts
 | Command | What it does |
 | --- | --- |
 | `npm run dev` | Dev server on port 3001 (no service worker) |
 | `npm run build` / `npm start` | Production build / run it (service worker on) |
 | `npm run lint` | ESLint |
-| `npm test` | Vitest: auth, profile cache, service worker rules, manifest and icons, check-in logic (dates, validation, merging, demo store, offline queue, SQL privacy rules), streaks, calendar grid, breathing timing, friends and shared streaks (rules, demo store, demo friend, SQL privacy rules) |
+| `npm test` | Vitest: auth, profile cache, service worker rules, manifest and icons, check-in logic (dates, validation, merging, demo store, offline queue, SQL privacy rules), streaks, calendar grid, breathing timing, friends and shared streaks (rules, demo store, demo friend, SQL privacy rules), insights (weekly averages, habits and mood) and export (JSON, CSV) |
 | `npm run icons` | Redraws the PNG icons (`scripts/make-icons.mjs`) |
 
 ## Folder map
-- `app/`: pages (`/`, `/checkin`, `/habits`, `/streaks`, `/breathe`, `/friends`, `/login`, `/signup`,
-  `/onboarding`, `/profile`, `/offline`), the layout, the manifest (`manifest.ts`), icons and global
+- `app/`: pages (`/`, `/checkin`, `/habits`, `/streaks`, `/insights`, `/breathe`, `/friends`, `/login`,
+  `/signup`, `/onboarding`, `/profile`, `/privacy`, `/offline`), the layout, the manifest (`manifest.ts`), icons and global
   styles.
 - `components/`: React components (forms, nav bar, home, profile, habits, service worker
   registration, breathing). `components/checkin/`: the check-in flow, its 5 screens and the "save as
   you go" hook. `components/streaks/`: the streaks page, the heatmap and the home page's card.
   `components/friends/`: the friends page, shared streaks, and the home page's Friends card (the nudge).
+  `components/insights/`: the weekly insights page. `components/ExportCard.tsx`: "Your data" (downloads).
 - `lib/auth/`: accounts. One `AuthService` interface, a Supabase version and a demo (localStorage)
   version, chosen by whether the Supabase keys are set. Copied from `apps/media-log`.
 - `lib/checkin/`: check-ins and habits. One `CheckinStore` interface, a Supabase version and a demo
@@ -187,13 +289,19 @@ To start fresh: DevTools > Application > Storage > "Clear site data".
   today's date key, validation, merging partial saves.
 - `lib/streaks.ts`, `lib/calendar.ts`, `lib/breathing.ts`: the pure logic of Stage 3 (streak rules,
   heatmap grid, breathing phases), each with its test file.
+- `lib/insights.ts`, `lib/export.ts`: the pure logic of Stage 5 (weekly summary, building the export
+  files), each with its test file.
 - `lib/friends/`: friends and shared streaks. One `FriendsStore` interface, a Supabase version and a
   demo version (plus demo friend Sam), and the pure shared-streak rules (`shared-streaks.ts`).
 - `lib/pwa/`: tests for the service worker and the manifest.
 - `public/sw.js`: the service worker. `public/icons/`: app icons.
 - `supabase/migrations/`: SQL to create the tables, with Row Level Security.
+- `docs/screenshots/`: the README pictures. `PRIVACY.md`: the privacy note.
 
 ## Privacy
+The plain-language version is [PRIVACY.md](PRIVACY.md) (also in the app at `/privacy`). The technical
+details:
+
 Your check-ins (mood, screen time, gratitude and journal) are readable only by you. This is enforced
 by the database's Row Level Security, not just the app: the `checkins` table has owner-only rules and
 will never get a "friends can read" rule. The streaks page and calendar only ever load the date and
@@ -211,3 +319,6 @@ The service worker never stores personal data: only page shells, code and icons,
 for everyone. In Supabase mode, two things are kept in this browser's localStorage: answers saved
 while offline (deleted as soon as they reach Supabase) and your habit list (names only, so the
 check-in works offline).
+
+The insights page, like streaks, only loads the date and mood of your check-ins. The export is the one
+place that loads whole check-ins (journal included), only your own, and only when you press Download.

@@ -35,6 +35,10 @@ export const PENDING_SYNC_PREFIX = "wellbeing-app:pending-sync:";
 /** Shown on the streaks page when it can't reach Supabase. */
 export const RANGE_OFFLINE_MESSAGE = "You're offline. Streaks and calendars will load when you're back online.";
 
+/** Stage 5: shown when "Export my data" can't reach Supabase. */
+export const EXPORT_OFFLINE_MESSAGE =
+  "You're offline. The export needs the internet so it can include all your days. Try again once you're back online.";
+
 export type SyncStorage = Pick<Storage, "getItem" | "setItem" | "removeItem">;
 
 /** One habit value waiting to be sent. value null = "remove it". */
@@ -349,6 +353,27 @@ export function createOfflineAwareStore({
         return overlayEntryRange(entries, Object.values(load(userId).entries), userId, from, to);
       } catch (error) {
         if (error instanceof OfflineError) throw new OfflineError(RANGE_OFFLINE_MESSAGE);
+        throw error;
+      }
+    },
+
+    // Stage 5: whole check-ins, for the export. Like the ranges above it needs
+    // the server (this device doesn't keep your history). Waiting changes are
+    // sent first; if one still couldn't go, it's applied on top, so the file
+    // has what you see in the app.
+    async listCheckins(from, to) {
+      const userId = await requireUser();
+      await syncPending();
+      try {
+        const rows = await online(() => inner.listCheckins(from, to));
+        const byDate = new Map(rows.map((row) => [row.date, row]));
+        for (const [date, patch] of Object.entries(load(userId).checkins)) {
+          if (date < from || date > to) continue;
+          byDate.set(date, localCheckin(userId, date, patch, byDate.get(date) ?? null));
+        }
+        return [...byDate.values()].sort((a, b) => a.date.localeCompare(b.date));
+      } catch (error) {
+        if (error instanceof OfflineError) throw new OfflineError(EXPORT_OFFLINE_MESSAGE);
         throw error;
       }
     },

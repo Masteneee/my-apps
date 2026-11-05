@@ -546,3 +546,108 @@ in `shared-streaks.test.ts`: no summaries → empty map; two habits with the sam
 and `Math.max`), then use it in `FriendsCard.tsx`. Bonus question: we chose not to store
 `best_count`. If a habit entry from 10 days ago is deleted, what happens to "best together"? Why is
 that the right behaviour?
+
+## Stage 5: Insights + ship (2026-11-05)
+
+### What we built
+- **Weekly insights** (`/insights`): your average mood this week vs last week, 8 weeks of averages,
+  and for each habit the average mood on days you did it vs days you didn't, with the number of days
+  behind every number. Linked from the home page's Streaks card, which also shows this week's average.
+- **Export my data** (Profile > Your data): download everything as JSON or CSV, journal included.
+- **Ship prep:** README with screenshots, deploy steps for Vercel, a plain-language privacy note
+  (`PRIVACY.md` and the `/privacy` page). Not deployed yet (no Vercel account here).
+
+### The plan (written before coding)
+1. `lib/insights.ts` (+ tests): weekly mood averages, the week-vs-week trend, habit vs mood averages
+   with a minimum-days rule. Pure functions, date keys only.
+2. `lib/export.ts` (+ tests): build the export object, turn it into JSON and CSV (quoting rules, BOM).
+3. Add `listCheckins(from, to)` to `CheckinStore` (demo, Supabase, offline wrapper): the only method
+   that returns whole check-ins, used only by the export.
+4. Pages: `/insights`, `/privacy`, and a "Your data" card on `/profile`. Both new pages in the service
+   worker's `APP_SHELL`.
+5. Lint, tests, build. Production server in demo mode, screenshots with Playwright, then docs.
+
+### The insight rules (decided this stage)
+- Only days with a mood count. No mood = we know nothing about that day, so it's left out.
+- Weeks run Monday to Sunday on local date keys, like the calendar.
+- Week vs last week needs at least **3** mood days in each. A change under **0.3** = "about the same".
+- Habits: the last **4** weeks, **without today**, from the day the habit was added. At least **4**
+  days on each side (done / not done) before any number is shown.
+- Every result says "correlation, not cause".
+
+### New concepts
+**Averages and why sample size matters.** An average is the sum divided by how many there are. With
+2 days, one great day moves it a lot; with 20 days, much less. That's why the app shows the number of
+days next to every average and refuses to say anything below a minimum. A rule you can explain ("at
+least 4 days each side") is more honest than a fancy score nobody can check.
+
+**Correlation is not causation.** Two things that happen together (walking, good mood) don't prove one
+causes the other. Maybe you walk because you already feel good, or sunny weekends cause both. The only
+way to really know is an experiment (walk on purpose on random days and compare). The app can only show
+"these went together", and says so.
+
+**Excluding biased data (today).** Most people pick a mood in the morning and tick habits later. If
+today counted, it would almost always look like a "not done" day with a mood, pulling the "not done"
+average toward today's mood. Leaving out the day that isn't over removes that bias. Same idea for days
+before a habit existed: they weren't "not done", the habit just wasn't there.
+
+**JSON vs CSV.** JSON keeps the shape of the data (lists inside objects), so a program can read it
+back exactly: good for backups. CSV is a flat table (rows and columns), which every spreadsheet opens:
+good for people. We make both from the same object, so they can't disagree.
+
+**CSV quoting (RFC 4180).** A cell that contains a comma, a quote or a line break is wrapped in double
+quotes, and quotes inside it are doubled (`"I said ""hi"""`). Without this, a journal with a comma
+would split into two columns. We also start the file with a "BOM" character so Excel knows it's UTF-8.
+
+**Downloading a file without a server (Blob + object URL).** A `Blob` is a chunk of data in the
+browser's memory. `URL.createObjectURL(blob)` gives it a temporary `blob:` address, and clicking a
+link with a `download` attribute saves it as a file. Nothing is uploaded. We free the address after
+with `URL.revokeObjectURL`.
+
+**Least data for each screen.** Insights and streaks use `listCheckinDays` (date + mood only). Only
+the export uses the new `listCheckins`, which brings the journal along. Fewer places that load private
+text = fewer places it could leak.
+
+**Deploying (Vercel) and HTTPS.** Vercel builds the app from GitHub on every push and serves it over
+HTTPS. Browsers only allow service workers and "install this app" on HTTPS pages (plus `localhost`),
+so the PWA can only be installed on a phone once it's deployed. Supabase must also know the deployed
+address (Site URL and Redirect URLs), or confirmation emails point back to localhost.
+
+**Reused from earlier stages:** `startOfWeek` and `shortDate` (Stage 3 calendar), `isHabitDone`
+(Stage 3, so "done" means the same everywhere), `addDays` and `dateKeyInTimeZone` (Stage 2),
+`useStreakData` (the insights page needs exactly the same data), `fetchAllPages` (Stage 3), the offline
+wrapper's "send waiting changes first" pattern (Stage 2) and `APP_SHELL` (Stage 1).
+
+### Dependencies
+None added. Blobs and downloads are built into browsers. The screenshots used the Playwright already
+installed on the machine, from a throwaway script outside the app (it isn't in `package.json`).
+
+### Offline
+`/insights` and `/privacy` are saved in advance. In demo mode both work offline, and so does the export.
+In Supabase mode, insights and the export need the internet (your history is on the server): insights
+say "You're offline. Insights will load when you're back online", the export says it needs the internet.
+
+### Files in this stage
+- `lib/insights.ts` (+ `insights.test.ts`): weekly averages, trend, habit vs mood, the sentences.
+- `lib/export.ts` (+ `export.test.ts`): `buildExport`, `exportToJson`, `exportToCsv`, `csvField`, file names.
+- `lib/checkin/types.ts`, `mock.ts`, `supabase.ts`, `offline.ts` (+ tests in `mock.test.ts`,
+  `offline.test.ts`): the new `listCheckins` method in the store contract and its 3 versions.
+- `app/insights/page.tsx` + `components/insights/InsightsView.tsx`: the insights page.
+- `components/ExportCard.tsx` + `components/ProfileView.tsx`: "Your data" with the two downloads (and
+  the old "Friends: soon" text replaced with a link to `/friends`).
+- `app/privacy/page.tsx` + `PRIVACY.md`: the privacy note (same text, keep them in sync).
+- `components/streaks/StreaksCard.tsx`: this week's average mood and the "Weekly insights" link.
+- `components/HomeView.tsx`: a privacy link on the welcome screen.
+- `public/sw.js` + `lib/pwa/service-worker.test.ts`: `/insights` and `/privacy` saved in advance.
+- `docs/screenshots/*.png` (new): 4 phone-sized screenshots, 120 to 195 KB each.
+- `README.md`, `LEARNING.md`: this.
+
+### Exercise
+Add a **"Best day of the week"** line to the insights page: the weekday with the highest average mood
+over the last 8 weeks ("Your best day lately: Saturday, 4.1 over 6 days"). First write a pure function
+`moodByWeekday(days, today)` in `lib/insights.ts` that returns 7 entries `{ weekday, average, days }`
+(use `weekdayOf` from `lib/checkin/date.ts` and `average`). Write the tests first in
+`insights.test.ts`: no days → every average null; two Mondays with 4 and 2 → Monday 3.0 over 2 days;
+days older than 8 weeks are ignored. Then only show the line if the best weekday has at least 3 days.
+Bonus question: if you check in on Saturdays more often than Tuesdays, is "Saturday is your best day"
+still a fair sentence? What would make it fairer?

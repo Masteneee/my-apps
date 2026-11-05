@@ -248,6 +248,26 @@ export function createSupabaseCheckinStore(supabase: SupabaseClient): CheckinSto
       );
     },
 
+    // Stage 5: whole check-ins, for "Export my data". RLS only ever returns
+    // your own rows ("Owner can read their checkins"), so even a bug here
+    // couldn't export someone else's journal.
+    async listCheckins(from, to) {
+      const userId = await requireUser();
+      const range = validateDateRange(from, to);
+      if (!range.ok) throw new Error(range.error);
+      const rows = await fetchAllPages<Checkin>((first, last) =>
+        supabase
+          .from("checkins")
+          .select(CHECKIN_COLUMNS)
+          .eq("user_id", userId)
+          .gte("date", from)
+          .lte("date", to)
+          .order("date", { ascending: true })
+          .range(first, last),
+      );
+      return rows.map(rowToCheckin);
+    },
+
     // The waiting-to-sync queue lives in ./offline.ts, which wraps this store.
     async pendingSyncCount() {
       return 0;

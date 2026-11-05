@@ -144,6 +144,11 @@ describe("app shell", () => {
     expect(sw.APP_SHELL).toContain("/friends");
   });
 
+  it("saves the insights and privacy pages in advance too (Stage 5)", () => {
+    expect(sw.APP_SHELL).toContain("/insights");
+    expect(sw.APP_SHELL).toContain("/privacy");
+  });
+
   it("only lists pages that really exist (a typo would make the whole install fail)", () => {
     const pages = sw.APP_SHELL.filter((path) => !path.startsWith("/icons/") && !path.includes("."));
     for (const path of pages) {

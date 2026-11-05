@@ -3,7 +3,8 @@
 // - signed out       -> a short welcome with "Create an account" / "Log in"
 // - no username yet  -> sent to /onboarding
 // - signed in        -> "Today": the check-in card (Stage 2), the streaks card (Stage 3)
-//                       and the friends card with the "your turn" nudge (Stage 4)
+//                       and the friends card with the "your turn" nudge (Stage 4).
+//                       The streaks card links to the weekly insights (Stage 5).
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -95,7 +96,12 @@ function Welcome() {
         </Link>
       </div>
 
-      <p className="text-xs text-muted">Your journal is private: only you can ever read it.</p>
+      <p className="text-xs text-muted">
+        Your journal is private: only you can ever read it.{" "}
+        <Link href="/privacy" className="underline underline-offset-4">
+          Privacy note
+        </Link>
+      </p>
     </div>
   );
 }

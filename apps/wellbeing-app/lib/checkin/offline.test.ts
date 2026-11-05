@@ -306,3 +306,24 @@ describe("overlayCheckinDays and overlayEntryRange", () => {
     ]);
   });
 });
+
+describe("offline-aware store: whole check-ins for the export (Stage 5)", () => {
+  it("online, it sends waiting changes first, then returns the server's full check-ins", async () => {
+    await store.saveCheckin("2026-11-04", { mood: 2, journal_text: "online words" });
+    goOffline();
+    await store.saveCheckin(DAY, { journal_text: "written offline" });
+    goOnline();
+
+    const rows = await store.listCheckins("2026-11-01", "2026-11-30");
+    expect(rows.map((c) => [c.date, c.journal_text])).toEqual([
+      ["2026-11-04", "online words"],
+      [DAY, "written offline"],
+    ]);
+    expect(await store.pendingSyncCount()).toBe(0);
+  });
+
+  it("offline, it says the export needs the internet", async () => {
+    goOffline();
+    await expect(store.listCheckins("2026-11-01", "2026-11-30")).rejects.toThrow("export needs the internet");
+  });
+});

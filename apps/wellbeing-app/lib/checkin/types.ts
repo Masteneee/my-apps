@@ -105,6 +105,12 @@ export interface CheckinStore {
   /** All your habit entries in that range, for every habit (archived ones too). */
   listHabitEntries(from: string, to: string): Promise<HabitEntry[]>;
 
+  // Stage 5: "Export my data". The ONLY method that returns whole check-ins
+  // (journal and gratitude included) for a range of days. Use it for the export
+  // and nothing else: screens that only need moods use listCheckinDays.
+  /** Your full check-ins in that range, oldest first (journal included: it's yours). */
+  listCheckins(from: string, to: string): Promise<Checkin[]>;
+
   /** How many changes are saved on this device, waiting for the internet. Always 0 in demo mode. */
   pendingSyncCount(): Promise<number>;
   /** Tries to send those waiting changes now. Returns how many are still waiting. */

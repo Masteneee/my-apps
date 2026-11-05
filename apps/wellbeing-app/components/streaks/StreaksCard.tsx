@@ -1,8 +1,11 @@
 "use client";
 // The "Streaks" card on the home page: your check-in streak and your best
 // three habit streaks, with a link to the full page (/streaks).
+// Stage 5: also this week's average mood, with a link to the weekly insights
+// (/insights). Same data, so no second load.
 
 import Link from "next/link";
+import { formatMood, weeklyMoods } from "@/lib/insights";
 import { streakHint } from "@/lib/streaks";
 import { card, link } from "../ui";
 import { useStreakData } from "./useStreakData";
@@ -40,10 +43,14 @@ export function StreaksCard() {
                 </li>
               ))}
           </ul>
+          <ThisWeekMood checkinDays={loaded.data.checkinDays} today={loaded.data.today} />
         </>
       )}
 
       <div className="mt-3 flex flex-wrap gap-x-5">
+        <Link href="/insights" className={`${link} inline-flex min-h-11 items-center text-sm`}>
+          Weekly insights
+        </Link>
         <Link href="/streaks" className={`${link} inline-flex min-h-11 items-center text-sm`}>
           Streaks and calendar
         </Link>
@@ -52,5 +59,20 @@ export function StreaksCard() {
         </Link>
       </div>
     </section>
+  );
+}
+
+/** "This week: average mood 3.8 (4 days)." Nothing until there's a mood this week. */
+function ThisWeekMood({ checkinDays, today }: { checkinDays: { date: string; mood: number | null }[]; today: string }) {
+  // weeklyMoods(..., 1) = just the current week (Monday to today).
+  const [week] = weeklyMoods(checkinDays, today, 1);
+  if (week.average === null) return null;
+  return (
+    <p className="mt-2 text-sm">
+      This week: average mood <strong className="tabular-nums">{formatMood(week.average)}</strong>{" "}
+      <span className="text-muted">
+        ({week.moodDays} {week.moodDays === 1 ? "day" : "days"})
+      </span>
+    </p>
   );
 }

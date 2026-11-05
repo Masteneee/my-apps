@@ -13,7 +13,7 @@
 
 import type { KeyValueStorage } from "../auth/mock";
 import { isDateKey } from "./date";
-import { applyPatch } from "./merge";
+import { applyPatch, fieldsOf } from "./merge";
 import type { Checkin, CheckinDay, CheckinStore, Habit, HabitEntry } from "./types";
 import { validateCheckinPatch, validateDateRange, validateEntryValue, validateNewHabit } from "./validation";
 
@@ -194,6 +194,16 @@ export function createMockCheckinStore({
       return load()
         .habitEntries.filter((e) => e.user_id === userId && e.date >= range.from && e.date <= range.to)
         .sort((a, b) => a.date.localeCompare(b.date) || a.habit_id.localeCompare(b.habit_id));
+    },
+
+    // Stage 5: whole check-ins, for "Export my data". Still only YOUR rows.
+    async listCheckins(from, to) {
+      const userId = await requireUser();
+      const range = requireRange(from, to);
+      return load()
+        .checkins.filter((c) => c.user_id === userId && c.date >= range.from && c.date <= range.to)
+        .map((c) => ({ ...c, ...fieldsOf(c) })) // fresh copies, repaired like a database row (3 gratitude slots)
+        .sort((a, b) => a.date.localeCompare(b.date));
     },
 
     // localStorage is always there, so nothing ever waits to sync in demo mode.

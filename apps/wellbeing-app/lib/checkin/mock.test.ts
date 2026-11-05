@@ -224,3 +224,30 @@ describe("demo store: ranges of days (Stage 3, streaks and calendars)", () => {
     await expect(store.listCheckinDays("2026-11-01", "2026-11-30")).rejects.toThrow("logged in");
   });
 });
+
+describe("demo store: whole check-ins for the export (Stage 5)", () => {
+  it("lists YOUR full check-ins in a range, oldest first, journal included", async () => {
+    await store.saveCheckin("2026-11-06", { mood: 5, journal_text: "my own words", gratitude: ["tea"] });
+    await store.saveCheckin("2026-11-04", { mood: 2 });
+    await store.saveCheckin("2026-10-01", { mood: 3 }); // outside the range
+    currentUser = "user-b";
+    await store.saveCheckin("2026-11-05", { journal_text: "someone else's journal" });
+    currentUser = "user-a";
+
+    const rows = await store.listCheckins("2026-11-01", "2026-11-30");
+    expect(rows.map((c) => c.date)).toEqual(["2026-11-04", "2026-11-06"]);
+    expect(rows[1]).toMatchObject({ mood: 5, journal_text: "my own words", gratitude: ["tea", "", ""] });
+    expect(JSON.stringify(rows)).not.toContain("someone else");
+  });
+
+  it("returns copies (changing them doesn't change what's saved) and checks the range", async () => {
+    await store.saveCheckin(DAY, { mood_tags: ["calm"] });
+    const [row] = await store.listCheckins(DAY, DAY);
+    row.mood_tags.push("changed");
+    expect((await store.getCheckin(DAY))?.mood_tags).toEqual(["calm"]);
+
+    await expect(store.listCheckins("2026-11-30", "2026-11-01")).rejects.toThrow("after");
+    currentUser = null;
+    await expect(store.listCheckins("2026-11-01", "2026-11-30")).rejects.toThrow("logged in");
+  });
+});

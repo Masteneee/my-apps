@@ -1,14 +1,17 @@
 "use client";
-// Your own profile: name, username, email, how to install the app, log out.
+// Your own profile: name, username, email, your data (export, Stage 5), how
+// to install the app, log out.
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { getAuthService } from "@/lib/auth";
 import { nameToShow } from "@/lib/home/greeting";
 import { useAuth } from "./AuthProvider";
 import { Avatar } from "./Avatar";
+import { ExportCard } from "./ExportCard";
 import { InstallHint } from "./InstallHint";
-import { buttonSecondary, card } from "./ui";
+import { buttonSecondary, card, link } from "./ui";
 
 export function ProfileView() {
   const router = useRouter();
@@ -52,10 +55,17 @@ export function ProfileView() {
           </div>
           <div>
             <dt className="text-muted">Friends</dt>
-            <dd>Soon, friends will add you by your username and keep shared streaks with you.</dd>
+            <dd>
+              Friends add you by your username.{" "}
+              <Link href="/friends" className={link}>
+                Friends and shared streaks
+              </Link>
+            </dd>
           </div>
         </dl>
       </section>
+
+      <ExportCard />
 
       <InstallHint />
 
