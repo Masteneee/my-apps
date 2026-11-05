@@ -5,20 +5,10 @@ import { useEffect, useState } from "react";
 import { getAuthService, type Profile } from "@/lib/auth";
 import { normalizeUsername } from "@/lib/auth/validation";
 import { getMediaStore, type LogWithMedia } from "@/lib/media";
-import { countByType, latestLogPerItem } from "@/lib/media/display";
-import type { MediaType } from "@/lib/media/types";
+import { countByType, groupByType, latestLogPerItem, TYPE_LABELS } from "@/lib/media/display";
+import { MEDIA_TYPES } from "@/lib/media/types";
 import { useAuth } from "./AuthProvider";
 import { PosterGrid } from "./PosterGrid";
-
-// The media types the app will cover, with the word shown under each counter.
-const COUNTERS: { type: MediaType; label: string }[] = [
-  { type: "movie", label: "Movies" },
-  { type: "series", label: "Series" },
-  { type: "anime", label: "Anime" },
-  { type: "manga", label: "Manga" },
-  { type: "book", label: "Books" },
-  { type: "game", label: "Games" },
-];
 
 // The result of looking up a username. We keep the username we looked up next
 // to the result, so after navigating to another profile we know the old
@@ -90,8 +80,8 @@ export function ProfileView({ username }: { username: string }) {
 
   const isMe = user?.id === profile.id;
   const name = profile.display_name || profile.username;
-  // Each movie once (its most recent log), and how many of each type.
-  const posters = latestLogPerItem(lookup.logs);
+  // Each item once (its most recent log), split by type, and how many of each type.
+  const groups = groupByType(latestLogPerItem(lookup.logs));
   const counts = countByType(lookup.logs);
 
   return (
@@ -121,10 +111,10 @@ export function ProfileView({ username }: { username: string }) {
 
       {/* One counter per media type. grid-cols-3 on phones, 6 in a row on wider screens. */}
       <section className="mt-10 grid grid-cols-3 gap-3 sm:grid-cols-6">
-        {COUNTERS.map(({ type, label }) => (
+        {MEDIA_TYPES.map((type) => (
           <div key={type} className="rounded-lg border border-zinc-800 bg-zinc-900 p-3 text-center">
             <div className="text-2xl font-bold">{counts[type]}</div>
-            <div className="text-xs text-zinc-400">{label}</div>
+            <div className="text-xs text-zinc-400">{TYPE_LABELS[type].many}</div>
           </div>
         ))}
       </section>
@@ -135,25 +125,32 @@ export function ProfileView({ username }: { username: string }) {
         </p>
       )}
 
-      {posters.length > 0 ? (
-        <section className="mt-10">
-          <div className="mb-4 flex items-baseline justify-between gap-3">
-            <h2 className="text-xl font-semibold">Movies</h2>
-            {isMe && (
+      {groups.length > 0 ? (
+        <>
+          {isMe && (
+            <p className="mt-8 text-right">
               <Link href="/search" className="text-sm text-violet-400 hover:underline">
-                Log another movie
+                Log something else
               </Link>
-            )}
-          </div>
-          <PosterGrid logs={posters} />
-        </section>
+            </p>
+          )}
+          {/* One section per media type that has something in it. */}
+          {groups.map((group) => (
+            <section key={group.type} className="mt-6">
+              <h2 className="mb-4 text-xl font-semibold">
+                {TYPE_LABELS[group.type].many} <span className="text-base font-normal text-zinc-500">{group.logs.length}</span>
+              </h2>
+              <PosterGrid logs={group.logs} />
+            </section>
+          ))}
+        </>
       ) : (
         <section className="mt-10 rounded-lg border border-dashed border-zinc-700 p-10 text-center">
           <h2 className="text-lg font-semibold">Nothing logged yet</h2>
           {isMe ? (
             <p className="mt-2 text-zinc-400">
               <Link href="/search" className="text-violet-400 hover:underline">
-                Search a movie
+                Search a movie, anime, book or game
               </Link>
               , rate it, and it shows up here.
             </p>

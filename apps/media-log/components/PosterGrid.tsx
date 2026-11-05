@@ -1,7 +1,7 @@
-// The poster grid on a profile: one poster per logged movie, with the rating
+// The poster grid on a profile: one poster per logged item, with the rating
 // (or the status, if not rated) underneath. Pure layout, no state.
 
-import { MOVIE_STATUS_LABELS, ratingToStars } from "@/lib/media/display";
+import { ratingToStars, statusLabel } from "@/lib/media/display";
 import type { LogWithMedia } from "@/lib/media";
 import { Poster } from "./Poster";
 
@@ -22,7 +22,7 @@ export function PosterGrid({ logs }: { logs: LogWithMedia[] }) {
                 {ratingToStars(log.rating)}
               </span>
             ) : (
-              MOVIE_STATUS_LABELS[log.status]
+              statusLabel(log.status, log.media.type)
             )}
             {log.media.year && <span className="text-zinc-500"> · {log.media.year}</span>}
           </p>

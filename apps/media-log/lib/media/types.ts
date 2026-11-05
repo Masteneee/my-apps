@@ -17,7 +17,8 @@ export type LogStatus = (typeof LOG_STATUSES)[number];
 /**
  * One search result, BEFORE anyone logs it (nothing is saved yet).
  * camelCase because it's our own app type, not a database row.
- * Stage 3 will convert every source (TMDB, AniList, ...) into this one shape.
+ * Every source adapter (lib/sources/: TMDB, AniList, Open Library, IGDB)
+ * converts its answers into this one shape.
  */
 export type MediaResult = {
   type: MediaType;
@@ -28,7 +29,7 @@ export type MediaResult = {
   year: number | null;
   coverUrl: string | null;
   creators: string[];
-  totalUnits: number | null;
+  totalUnits: number | null; // episodes (series, anime), chapters (manga), pages (books)
   overview: string | null; // short description, shown in search only (not stored)
 };
 
@@ -64,7 +65,7 @@ export type Log = {
 /** A log together with the item it is about (what the profile grid needs). */
 export type LogWithMedia = Log & { media: MediaItem };
 
-/** What the "log this movie" form sends. Checked by validateLogInput(). */
+/** What the "log this" form sends (for any media type). Checked by validateLogInput(). */
 export type NewLogInput = {
   media: MediaResult;
   status: LogStatus;

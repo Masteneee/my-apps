@@ -81,7 +81,10 @@ export function validateLogInput(input: NewLogInput, today: string): Result<Clea
   if (!rating.ok) return rating;
   // You can't rate what you haven't seen yet.
   if (input.status === "planned" && rating.value !== null) {
-    return { ok: false, error: "You can't rate something you haven't watched yet. Remove the rating or change the status." };
+    return {
+      ok: false,
+      error: "You can't rate something you haven't watched, read or played yet. Remove the rating or change the status.",
+    };
   }
 
   const review = (input.reviewText ?? "").trim();
@@ -89,7 +92,7 @@ export function validateLogInput(input: NewLogInput, today: string): Result<Clea
     return { ok: false, error: `Your review is too long (${review.length}/${REVIEW_MAX} characters).` };
   }
 
-  // A "watched on" date and the rewatch flag only make sense once it's finished.
+  // A "finished on" date and the rewatch flag only make sense once it's finished.
   const finished = input.status === "completed";
   let finishedAt: string | null = null;
   if (finished && input.finishedAt) {
@@ -98,7 +101,7 @@ export function validateLogInput(input: NewLogInput, today: string): Result<Clea
     }
     // "YYYY-MM-DD" strings sort like dates, so plain > works here.
     if (input.finishedAt > today) {
-      return { ok: false, error: "The watched date can't be in the future." };
+      return { ok: false, error: "The finished date can't be in the future." };
     }
     finishedAt = input.finishedAt;
   }

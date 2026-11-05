@@ -4,8 +4,9 @@ One place to log, rate and review everything you watch, read and play: movies, s
 books and games. Think Letterboxd, but for every kind of media, with one profile. See `PLAN.md` for
 the full plan and `LEARNING.md` for what each stage taught.
 
-**Status:** Stage 2 (database + movies) done. You can sign up, pick a username, search a movie, log it
-with a status, rating and review, and see it in the poster grid on your profile at `/u/username`.
+**Status:** Stage 3 (unified search) done. One search bar finds movies and series (TMDB), anime and manga
+(AniList), books (Open Library) and games (IGDB), merged into one list without duplicates. You can log any
+of them with a status, rating and review, and see them grouped by type on your profile at `/u/username`.
 
 ## Run it
 
@@ -16,9 +17,9 @@ npm run dev        # open http://localhost:3000
 ```
 
 With no `.env.local` the app runs in **demo mode**: a yellow strip says so, accounts, profiles and logs
-are saved only in this browser's localStorage, and the Google button is disabled. Movie search uses a
-saved **sample** of about a dozen movies until a TMDB key is set (the search page says so). Everything
-else works.
+are saved only in this browser's localStorage, and the Google button is disabled. Search uses small saved
+**samples** for TMDB and IGDB until their keys are set, and for AniList and Open Library whenever they can't
+be reached (the search page lists which sources use samples, and why). Everything else works.
 
 ## Commands (run inside `apps/media-log`)
 
@@ -55,7 +56,7 @@ Sign up then sends a confirmation email by default; click the link and you land 
 
 The code is already wired (`lib/auth/supabase.ts`, `signInWithGoogle`).
 
-## Connect TMDB (real movie search)
+## Connect TMDB (real movie and series search)
 
 1. Create a free account at themoviedb.org, then Settings > API > request an API key (choose
    "Developer", describe it as a personal learning project).
@@ -63,11 +64,31 @@ The code is already wired (`lib/auth/supabase.ts`, `signInWithGoogle`).
    **API Key**.
 3. In `.env.local`, set `TMDB_READ_ACCESS_TOKEN=...` (or `TMDB_API_KEY=...`). One is enough; if both are
    set, the token is used.
-4. Restart `npm run dev`. The "Sample data" note on `/search` disappears and any movie can be found.
+4. Restart `npm run dev`. TMDB disappears from the "Sample data" note on `/search`, and any movie or
+   series can be found.
 
-The key has no `NEXT_PUBLIC_` prefix, so it stays on the server: the browser calls our own
-`/api/movies/search`, and only that server code talks to TMDB. When deploying, add the same variable in
-Vercel's project settings.
+The key has no `NEXT_PUBLIC_` prefix, so it stays on the server: the browser calls our own `/api/search`,
+and only that server code talks to TMDB. When deploying, add the same variable in Vercel's project settings.
+
+## Connect IGDB (real game search)
+
+IGDB belongs to Twitch, so its key is a Twitch developer app.
+1. Log in at dev.twitch.tv/console (a free Twitch account; Twitch asks you to turn on two-factor
+   authentication first).
+2. Applications > **Register Your Application**: any name (e.g. `media-log-yourname`), OAuth Redirect URL
+   `http://localhost`, Category "Application Integration", Client Type **Confidential**.
+3. Open the app: copy the **Client ID**, click **New Secret** and copy the **Client Secret**.
+4. In `.env.local`, set `IGDB_CLIENT_ID=...` and `IGDB_CLIENT_SECRET=...`, then restart `npm run dev`.
+
+The server trades these for a temporary token at Twitch and remembers it (about 60 days), see
+`lib/sources/igdb.ts`. Add both variables in Vercel too when deploying.
+
+## AniList and Open Library
+
+No key needed. When a live call fails (offline, the site is down, rate limit), the search quietly uses
+that source's saved sample and the page says "couldn't reach it". The terminal running `npm run dev` logs
+the reason. Set `MEDIA_LOG_USE_SAMPLES=1` in `.env.local` to force samples for **every** source (handy
+offline).
 
 ## Test it by hand (demo mode)
 1. `npm run dev`, open http://localhost:3000, click **Sign up**.
@@ -80,14 +101,26 @@ Vercel's project settings.
    then the right one: you're back on your profile.
 7. Narrow the window to phone width: the nav, header and counters rearrange without overflowing.
 
-8. Logged in, click **Search** in the nav bar. The yellow "Sample data" note shows. Search `interstellar`,
-   click **Log it**. Pick **Want to watch**: the rating box greys out. Pick **Watched**, choose 4.5 stars,
-   write a review, tick "rewatch", **Save to my log**. A green message appears with a link.
-9. Search `parasite`, log it as **Want to watch** with no rating. Then log Interstellar again with 5 stars.
-10. Open your profile: the Movies counter says **2**, the grid shows Interstellar (★★★★★, the newest log
-    wins) and Parasite ("Want to watch"). Reload: still there.
-11. Log out and search again: results show "Log in to log this movie" instead of the button.
-12. Search `zzz`: "No movies found". Posters need internet; without it, each poster shows its title instead.
+8. Logged in, click **Search** in the nav bar. The yellow "Sample data" note lists TMDB and IGDB ("no key
+   set"). Search `dune` with **All**. With the samples you get the Dune movie and the Dune book first (exact
+   title), then the Spice Wars game, Dune: Part Two, Dune II and Dune Messiah. Only **one** "Dune" book
+   shows, though the Open Library sample has two entries for it. (Online, Open Library's real answer gives
+   more books.) The note now also lists AniList and Open Library ("couldn't
+   reach it") if you're offline.
+9. Click the **Games** chip: the search re-runs and only the two games remain. Click **Books**, then **All**.
+10. Search `spirited away`: only ONE Spirited Away, typed **Anime**, with "Studio Ghibli · 1 episode",
+    although TMDB also has it as a movie (duplicates are merged). Search `attack on titan`: the anime and the manga
+    ("Hajime Isayama · 141 chapters"), but not TMDB's series (same show as the anime).
+11. Log the `interstellar` movie as **Watched**, 4.5 stars, with a review and "rewatch". A green message
+    appears with a link.
+12. Log the Dune **book**: the statuses say "Want to read / Reading / Read", the date field says
+    "Finished on", the checkbox says "reread". Log *The Witcher 3* game as **Want to play** (rating greys
+    out), and the Attack on Titan manga as **Reading** with 4 stars.
+13. Open your profile: counters Movies 1, Manga 1, Books 1, Games 1, and one poster section per type, the
+    game showing "Want to play". Reload: still there.
+14. Log out and search again: results show "Log in to log this" instead of the button.
+15. Search `zzz`: "Nothing found". With the **Anime** chip: "No anime found". Covers need internet;
+    without it, each cover shows its title instead.
 
 To reset demo data: DevTools > Application > Local Storage > delete `media-log:mock-db` (accounts) and
 `media-log:mock-media` (logs).
@@ -96,11 +129,12 @@ To reset demo data: DevTools > Application > Local Storage > delete `media-log:m
 
 ```
 app/                 pages (folder = URL), layout, global CSS
-app/api/             route handlers: server-only URLs that answer JSON (movie search)
+app/api/             route handlers: server-only URLs that answer JSON (/api/search)
 components/          React components (forms, nav bar, profile view, search, poster grid, AuthProvider)
 lib/auth/            the AuthService interface + mock and Supabase backends + validation (+ tests)
 lib/media/           the MediaStore interface (logs) + mock and Supabase stores + log validation (+ tests)
-lib/tmdb/            TMDB types, converter to our MediaResult, real + sample search, saved sample (+ tests)
+lib/sources/         one adapter per search source (tmdb, anilist, openlibrary, igdb), merging + dedup,
+                     the unified search, env setup, saved sample answers in samples/ (+ tests)
 lib/supabase/        the one shared Supabase client
 supabase/migrations/ SQL to paste into Supabase, in filename order
 ```
@@ -109,7 +143,12 @@ Pages never import Supabase directly: they call `getAuthService()` from `lib/aut
 from `lib/media`, which return the Supabase versions when both `NEXT_PUBLIC_SUPABASE_URL` and
 `NEXT_PUBLIC_SUPABASE_ANON_KEY` are set, and the localStorage demo versions otherwise.
 
-Movie search: the page calls `GET /api/movies/search?q=...` (`app/api/movies/search/route.ts`). On the
-server, `lib/tmdb/server.ts` picks the real TMDB search when a TMDB key is set, or the saved sample
-otherwise. Both go through the same converter (`lib/tmdb/convert.ts`) and answer
-`{ results, usesSample }`.
+Search: the page calls `GET /api/search?q=dune&type=all` (`app/api/search/route.ts`). On the server:
+1. `lib/sources/server.ts` reads the keys and `lib/sources/setup.ts` picks, for each source, the real API
+   or its saved sample (and a sample fallback for AniList and Open Library).
+2. `lib/sources/unified.ts` asks every source that covers the chosen type, all at the same time. Each
+   **adapter** (`tmdb.ts`, `anilist.ts`, `openlibrary.ts`, `igdb.ts`) calls its API and converts the answer
+   into our one `MediaResult` type. A failing source doesn't stop the others.
+3. `lib/sources/merge.ts` interleaves the types, merges duplicates, and puts exact title matches first.
+4. The answer is `{ query, filter, results, sources }`, where `sources` says which source was live, used
+   samples (and why) or failed (and why).

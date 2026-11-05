@@ -84,6 +84,27 @@ describe("demo media store: adding logs", () => {
     expect(saved.mediaItems).toHaveLength(1);
     expect(saved.logs).toHaveLength(3);
   });
+
+  it("logs every media type from the unified search (anime, manga, book, game...)", async () => {
+    const make = (type: MediaResult["type"], source: MediaResult["source"], sourceId: string): MediaResult => ({
+      ...result(sourceId, `${type} ${sourceId}`),
+      type,
+      source,
+      totalUnits: type === "book" ? 604 : null,
+    });
+    await store.addLog(logOf(make("anime", "anilist", "16498")));
+    await store.addLog(logOf(make("manga", "anilist", "53390"), { status: "in_progress", rating: null }));
+    const book = await store.addLog(logOf(make("book", "openlibrary", "OL893415W")));
+    await store.addLog(logOf(make("game", "igdb", "1942"), { status: "planned", rating: null }));
+    // TMDB numbers movies and series separately: movie 550 and series 550 are two items.
+    await store.addLog(logOf(make("movie", "tmdb", "550")));
+    await store.addLog(logOf(make("series", "tmdb", "550")));
+
+    expect(book.media).toMatchObject({ type: "book", source: "openlibrary", source_id: "OL893415W", total_units: 604 });
+    const logs = await store.getLogsForUser("user-1");
+    expect(logs.map((l) => l.media.type).sort()).toEqual(["anime", "book", "game", "manga", "movie", "series"]);
+    expect(new Set(logs.map((l) => l.media.id)).size).toBe(6);
+  });
 });
 
 describe("demo media store: reading logs", () => {

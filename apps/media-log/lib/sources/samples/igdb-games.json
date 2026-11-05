@@ -1,0 +1,294 @@
+[
+  {
+    "id": 1942,
+    "name": "The Witcher 3: Wild Hunt",
+    "first_release_date": 1431993600,
+    "cover": {
+      "id": 19420,
+      "image_id": "co1wyy"
+    },
+    "involved_companies": [
+      {
+        "id": 1001,
+        "developer": true,
+        "company": {
+          "id": 2002,
+          "name": "CD Projekt RED"
+        }
+      },
+      {
+        "id": 1002,
+        "developer": false,
+        "company": {
+          "id": 2003,
+          "name": "Bandai Namco Entertainment"
+        }
+      }
+    ],
+    "summary": "Geralt of Rivia, a monster hunter for hire, searches a war-torn open world for his adopted daughter, who is hunted by the Wild Hunt."
+  },
+  {
+    "id": 80,
+    "name": "The Witcher",
+    "first_release_date": 1193356800,
+    "cover": {
+      "id": 800,
+      "image_id": "co1wum"
+    },
+    "involved_companies": [
+      {
+        "id": 1003,
+        "developer": true,
+        "company": {
+          "id": 2004,
+          "name": "CD Projekt RED"
+        }
+      },
+      {
+        "id": 1004,
+        "developer": false,
+        "company": {
+          "id": 2005,
+          "name": "Atari"
+        }
+      }
+    ],
+    "summary": "Geralt, a witcher who has lost his memory, is pulled into a fight over a stolen mutagen formula."
+  },
+  {
+    "id": 119133,
+    "name": "Elden Ring",
+    "first_release_date": 1645747200,
+    "cover": {
+      "id": 1191330,
+      "image_id": "co4jni"
+    },
+    "involved_companies": [
+      {
+        "id": 1005,
+        "developer": true,
+        "company": {
+          "id": 2006,
+          "name": "FromSoftware"
+        }
+      },
+      {
+        "id": 1006,
+        "developer": false,
+        "company": {
+          "id": 2007,
+          "name": "Bandai Namco Entertainment"
+        }
+      }
+    ],
+    "summary": "An open-world action role-playing game set in the Lands Between, a realm shattered after the Elden Ring was broken."
+  },
+  {
+    "id": 14593,
+    "name": "Hollow Knight",
+    "first_release_date": 1487894400,
+    "cover": {
+      "id": 145930,
+      "image_id": "co1rgi"
+    },
+    "involved_companies": [
+      {
+        "id": 1007,
+        "developer": true,
+        "company": {
+          "id": 2008,
+          "name": "Team Cherry"
+        }
+      }
+    ],
+    "summary": "A tiny knight explores a vast ruined kingdom of insects, full of secrets, bosses and new paths."
+  },
+  {
+    "id": 7346,
+    "name": "The Legend of Zelda: Breath of the Wild",
+    "first_release_date": 1488499200,
+    "cover": {
+      "id": 73460,
+      "image_id": "co3p2d"
+    },
+    "involved_companies": [
+      {
+        "id": 1008,
+        "developer": true,
+        "company": {
+          "id": 2009,
+          "name": "Nintendo EPD"
+        }
+      },
+      {
+        "id": 1009,
+        "developer": false,
+        "company": {
+          "id": 2010,
+          "name": "Nintendo"
+        }
+      }
+    ],
+    "summary": "Link wakes up after a hundred years of sleep and explores a huge open Hyrule to defeat Calamity Ganon."
+  },
+  {
+    "id": 1009,
+    "name": "The Last of Us",
+    "first_release_date": 1371168000,
+    "cover": {
+      "id": 10090,
+      "image_id": "co1r7f"
+    },
+    "involved_companies": [
+      {
+        "id": 1010,
+        "developer": true,
+        "company": {
+          "id": 2011,
+          "name": "Naughty Dog"
+        }
+      },
+      {
+        "id": 1011,
+        "developer": false,
+        "company": {
+          "id": 2012,
+          "name": "Sony Computer Entertainment"
+        }
+      }
+    ],
+    "summary": "Joel, a smuggler, escorts the teenager Ellie across a post-pandemic United States."
+  },
+  {
+    "id": 150010,
+    "name": "Dune: Spice Wars",
+    "first_release_date": 1650931200,
+    "cover": {
+      "id": 1500100,
+      "image_id": "co4zmj"
+    },
+    "involved_companies": [
+      {
+        "id": 1012,
+        "developer": true,
+        "company": {
+          "id": 2013,
+          "name": "Shiro Games"
+        }
+      },
+      {
+        "id": 1013,
+        "developer": false,
+        "company": {
+          "id": 2014,
+          "name": "Funcom"
+        }
+      }
+    ],
+    "summary": "A real-time strategy game where houses fight for control of the spice on the desert planet Arrakis."
+  },
+  {
+    "id": 2118,
+    "name": "Dune II: The Building of a Dynasty",
+    "first_release_date": 723168000,
+    "cover": {
+      "id": 21180,
+      "image_id": "co2ivg"
+    },
+    "involved_companies": [
+      {
+        "id": 1014,
+        "developer": true,
+        "company": {
+          "id": 2015,
+          "name": "Westwood Studios"
+        }
+      },
+      {
+        "id": 1015,
+        "developer": false,
+        "company": {
+          "id": 2016,
+          "name": "Virgin Games"
+        }
+      }
+    ],
+    "summary": "Three houses compete to harvest spice on Arrakis in one of the first real-time strategy games."
+  },
+  {
+    "id": 113112,
+    "name": "Hades",
+    "first_release_date": 1600300800,
+    "cover": {
+      "id": 1131120,
+      "image_id": "co39vc"
+    },
+    "involved_companies": [
+      {
+        "id": 1016,
+        "developer": true,
+        "company": {
+          "id": 2017,
+          "name": "Supergiant Games"
+        }
+      }
+    ],
+    "summary": "Zagreus, the son of Hades, fights his way out of the underworld, again and again."
+  },
+  {
+    "id": 17000,
+    "name": "Stardew Valley",
+    "first_release_date": 1456444800,
+    "cover": {
+      "id": 170000,
+      "image_id": "xrpmydnu9rpxvxfjkiu7"
+    },
+    "involved_companies": [
+      {
+        "id": 1017,
+        "developer": true,
+        "company": {
+          "id": 2018,
+          "name": "ConcernedApe"
+        }
+      },
+      {
+        "id": 1018,
+        "developer": false,
+        "company": {
+          "id": 2019,
+          "name": "Chucklefish"
+        }
+      }
+    ],
+    "summary": "You inherit your grandfather's old farm and start a new life in a small town."
+  },
+  {
+    "id": 11737,
+    "name": "Outer Wilds",
+    "first_release_date": 1559001600,
+    "cover": {
+      "id": 117370,
+      "image_id": "co65ac"
+    },
+    "involved_companies": [
+      {
+        "id": 1019,
+        "developer": true,
+        "company": {
+          "id": 2020,
+          "name": "Mobius Digital"
+        }
+      },
+      {
+        "id": 1020,
+        "developer": false,
+        "company": {
+          "id": 2021,
+          "name": "Annapurna Interactive"
+        }
+      }
+    ],
+    "summary": "An astronaut explores a small solar system stuck in a 22-minute time loop."
+  }
+]

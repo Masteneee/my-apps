@@ -1,0 +1,690 @@
+{
+  "data": {
+    "anime": {
+      "media": [
+        {
+          "id": 16498,
+          "type": "ANIME",
+          "format": "TV",
+          "title": {
+            "romaji": "Shingeki no Kyojin",
+            "english": "Attack on Titan",
+            "native": "進撃の巨人"
+          },
+          "synonyms": [
+            "AoT",
+            "SnK"
+          ],
+          "startDate": {
+            "year": 2013,
+            "month": 4,
+            "day": 7
+          },
+          "coverImage": {
+            "large": "https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx16498-C6FPmWm59CyP.jpg"
+          },
+          "episodes": 25,
+          "chapters": null,
+          "volumes": null,
+          "description": "Several hundred years ago, humans were nearly exterminated by titans.<br><br>\nTitans are typically several stories tall, seem to have no intelligence and devour human beings. <i>(Source: our own summary)</i>",
+          "isAdult": false,
+          "studios": {
+            "nodes": [
+              {
+                "name": "Wit Studio"
+              }
+            ]
+          },
+          "staff": {
+            "edges": [
+              {
+                "role": "Original Creator",
+                "node": {
+                  "name": {
+                    "full": "Hajime Isayama"
+                  }
+                }
+              },
+              {
+                "role": "Director",
+                "node": {
+                  "name": {
+                    "full": "Tetsurou Araki"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "id": 199,
+          "type": "ANIME",
+          "format": "MOVIE",
+          "title": {
+            "romaji": "Sen to Chihiro no Kamikakushi",
+            "english": "Spirited Away",
+            "native": "千と千尋の神隠し"
+          },
+          "synonyms": [
+            "Sen and Chihiro's Spiriting Away"
+          ],
+          "startDate": {
+            "year": 2001,
+            "month": 7,
+            "day": 20
+          },
+          "coverImage": {
+            "large": "https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx199-dn9Pdd6I2JNz.jpg"
+          },
+          "episodes": 1,
+          "chapters": null,
+          "volumes": null,
+          "description": "Ten-year-old Chihiro wanders into a world of spirits, where her parents are turned into pigs, and takes a job in a bathhouse for gods to save them.",
+          "isAdult": false,
+          "studios": {
+            "nodes": [
+              {
+                "name": "Studio Ghibli"
+              }
+            ]
+          },
+          "staff": {
+            "edges": [
+              {
+                "role": "Director",
+                "node": {
+                  "name": {
+                    "full": "Hayao Miyazaki"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "id": 21519,
+          "type": "ANIME",
+          "format": "MOVIE",
+          "title": {
+            "romaji": "Kimi no Na wa.",
+            "english": "Your Name.",
+            "native": "君の名は。"
+          },
+          "synonyms": [
+            "Your Name"
+          ],
+          "startDate": {
+            "year": 2016,
+            "month": 8,
+            "day": 26
+          },
+          "coverImage": {
+            "large": "https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx21519-XIr3PeczUjjF.png"
+          },
+          "episodes": 1,
+          "chapters": null,
+          "volumes": null,
+          "description": "Mitsuha, a girl in a small mountain town, and Taki, a boy in Tokyo, start waking up in each other's bodies.",
+          "isAdult": false,
+          "studios": {
+            "nodes": [
+              {
+                "name": "CoMix Wave Films"
+              }
+            ]
+          },
+          "staff": {
+            "edges": [
+              {
+                "role": "Director",
+                "node": {
+                  "name": {
+                    "full": "Makoto Shinkai"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "id": 1535,
+          "type": "ANIME",
+          "format": "TV",
+          "title": {
+            "romaji": "DEATH NOTE",
+            "english": "Death Note",
+            "native": "デスノート"
+          },
+          "synonyms": [],
+          "startDate": {
+            "year": 2006,
+            "month": 10,
+            "day": 4
+          },
+          "coverImage": {
+            "large": "https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx1535-lawCwhzhi96X.jpg"
+          },
+          "episodes": 37,
+          "chapters": null,
+          "volumes": null,
+          "description": "Light Yagami is a top student who finds the Death Note, a notebook that kills anyone whose name is written in it.",
+          "isAdult": false,
+          "studios": {
+            "nodes": [
+              {
+                "name": "MADHOUSE"
+              }
+            ]
+          },
+          "staff": {
+            "edges": [
+              {
+                "role": "Original Story",
+                "node": {
+                  "name": {
+                    "full": "Tsugumi Ohba"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "id": 21,
+          "type": "ANIME",
+          "format": "TV",
+          "title": {
+            "romaji": "ONE PIECE",
+            "english": "ONE PIECE",
+            "native": "ONE PIECE"
+          },
+          "synonyms": [
+            "OP"
+          ],
+          "startDate": {
+            "year": 1999,
+            "month": 10,
+            "day": 20
+          },
+          "coverImage": {
+            "large": "https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx21-YCDoj1EkAxFn.jpg"
+          },
+          "episodes": null,
+          "chapters": null,
+          "volumes": null,
+          "description": "Monkey D. Luffy, a boy whose body stretches like rubber, sets out to sea to find the legendary treasure of the late pirate king.",
+          "isAdult": false,
+          "studios": {
+            "nodes": [
+              {
+                "name": "Toei Animation"
+              }
+            ]
+          },
+          "staff": {
+            "edges": [
+              {
+                "role": "Original Creator",
+                "node": {
+                  "name": {
+                    "full": "Eiichiro Oda"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "id": 329,
+          "type": "ANIME",
+          "format": "TV",
+          "title": {
+            "romaji": "Planetes",
+            "english": "Planetes",
+            "native": "プラネテス"
+          },
+          "synonyms": [
+            "ΠΛΑΝΗΤΕΣ"
+          ],
+          "startDate": {
+            "year": 2003,
+            "month": 10,
+            "day": 4
+          },
+          "coverImage": {
+            "large": "https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx329-sB6hn9wPzmRG.jpg"
+          },
+          "episodes": 26,
+          "chapters": null,
+          "volumes": null,
+          "description": "In 2075, Hachimaki works on a crew that collects space debris, the junk that threatens every ship in orbit, and dreams of owning his own spaceship.",
+          "isAdult": false,
+          "studios": {
+            "nodes": [
+              {
+                "name": "Sunrise"
+              }
+            ]
+          },
+          "staff": {
+            "edges": [
+              {
+                "role": "Original Creator",
+                "node": {
+                  "name": {
+                    "full": "Makoto Yukimura"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "id": 154587,
+          "type": "ANIME",
+          "format": "TV",
+          "title": {
+            "romaji": "Sousou no Frieren",
+            "english": "Frieren: Beyond Journey’s End",
+            "native": "葬送のフリーレン"
+          },
+          "synonyms": [
+            "Frieren at the Funeral"
+          ],
+          "startDate": {
+            "year": 2023,
+            "month": 9,
+            "day": 29
+          },
+          "coverImage": {
+            "large": "https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx154587-n1fmjRv4JQUd.jpg"
+          },
+          "episodes": 28,
+          "chapters": null,
+          "volumes": null,
+          "description": "The elf mage Frieren and her party defeated the Demon King. Decades later, she sets out to understand the humans she travelled with.",
+          "isAdult": false,
+          "studios": {
+            "nodes": [
+              {
+                "name": "MADHOUSE"
+              }
+            ]
+          },
+          "staff": {
+            "edges": [
+              {
+                "role": "Original Story",
+                "node": {
+                  "name": {
+                    "full": "Kanehito Yamada"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "id": 1,
+          "type": "ANIME",
+          "format": "TV",
+          "title": {
+            "romaji": "Cowboy Bebop",
+            "english": "Cowboy Bebop",
+            "native": "カウボーイビバップ"
+          },
+          "synonyms": [],
+          "startDate": {
+            "year": 1998,
+            "month": 4,
+            "day": 3
+          },
+          "coverImage": {
+            "large": "https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx1-CXtrrkMpJ8Zq.png"
+          },
+          "episodes": 26,
+          "chapters": null,
+          "volumes": null,
+          "description": "In 2071, a crew of bounty hunters drifts across the solar system on their ship, the Bebop, chasing criminals and their own pasts.",
+          "isAdult": false,
+          "studios": {
+            "nodes": [
+              {
+                "name": "Sunrise"
+              }
+            ]
+          },
+          "staff": {
+            "edges": [
+              {
+                "role": "Director",
+                "node": {
+                  "name": {
+                    "full": "Shinichirou Watanabe"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "id": 5114,
+          "type": "ANIME",
+          "format": "TV",
+          "title": {
+            "romaji": "Hagane no Renkinjutsushi: FULLMETAL ALCHEMIST",
+            "english": "Fullmetal Alchemist: Brotherhood",
+            "native": "鋼の錬金術師 FULLMETAL ALCHEMIST"
+          },
+          "synonyms": [
+            "FMA:B"
+          ],
+          "startDate": {
+            "year": 2009,
+            "month": 4,
+            "day": 5
+          },
+          "coverImage": {
+            "large": "https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx5114-KJTQz9AIm6Wk.jpg"
+          },
+          "episodes": 64,
+          "chapters": null,
+          "volumes": null,
+          "description": "Two brothers who lost their bodies in a forbidden alchemy experiment search for the Philosopher's Stone to get them back.",
+          "isAdult": false,
+          "studios": {
+            "nodes": [
+              {
+                "name": "bones"
+              }
+            ]
+          },
+          "staff": {
+            "edges": [
+              {
+                "role": "Original Creator",
+                "node": {
+                  "name": {
+                    "full": "Hiromu Arakawa"
+                  }
+                }
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "manga": {
+      "media": [
+        {
+          "id": 53390,
+          "type": "MANGA",
+          "format": "MANGA",
+          "title": {
+            "romaji": "Shingeki no Kyojin",
+            "english": "Attack on Titan",
+            "native": "進撃の巨人"
+          },
+          "synonyms": [
+            "AoT"
+          ],
+          "startDate": {
+            "year": 2009,
+            "month": 9,
+            "day": 9
+          },
+          "coverImage": {
+            "large": "https://s4.anilist.co/file/anilistcdn/media/manga/cover/large/bx53390-1RsuABC34P9D.jpg"
+          },
+          "episodes": null,
+          "chapters": 141,
+          "volumes": 34,
+          "description": "Humanity hides behind enormous walls from the man-eating titans.<br>\nEren Yeager swears to wipe them out after one breaks through.",
+          "isAdult": false,
+          "studios": {
+            "nodes": []
+          },
+          "staff": {
+            "edges": [
+              {
+                "role": "Story & Art",
+                "node": {
+                  "name": {
+                    "full": "Hajime Isayama"
+                  }
+                }
+              },
+              {
+                "role": "Translator (English)",
+                "node": {
+                  "name": {
+                    "full": "Sheldon Drzka"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "id": 30013,
+          "type": "MANGA",
+          "format": "MANGA",
+          "title": {
+            "romaji": "ONE PIECE",
+            "english": "One Piece",
+            "native": "ONE PIECE"
+          },
+          "synonyms": [],
+          "startDate": {
+            "year": 1997,
+            "month": 7,
+            "day": 22
+          },
+          "coverImage": {
+            "large": "https://s4.anilist.co/file/anilistcdn/media/manga/cover/large/bx30013-tZVlfBCHbrNL.jpg"
+          },
+          "episodes": null,
+          "chapters": null,
+          "volumes": null,
+          "description": "Luffy and his Straw Hat crew sail the Grand Line in search of the One Piece.",
+          "isAdult": false,
+          "studios": {
+            "nodes": []
+          },
+          "staff": {
+            "edges": [
+              {
+                "role": "Story & Art",
+                "node": {
+                  "name": {
+                    "full": "Eiichiro Oda"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "id": 30002,
+          "type": "MANGA",
+          "format": "MANGA",
+          "title": {
+            "romaji": "Berserk",
+            "english": "Berserk",
+            "native": "ベルセルク"
+          },
+          "synonyms": [],
+          "startDate": {
+            "year": 1989,
+            "month": 8,
+            "day": 25
+          },
+          "coverImage": {
+            "large": "https://s4.anilist.co/file/anilistcdn/media/manga/cover/large/bx30002-7EzO7o21jzeF.jpg"
+          },
+          "episodes": null,
+          "chapters": null,
+          "volumes": null,
+          "description": "Guts, a lone mercenary with a giant sword, fights demons and the friend who betrayed him.",
+          "isAdult": false,
+          "studios": {
+            "nodes": []
+          },
+          "staff": {
+            "edges": [
+              {
+                "role": "Story & Art",
+                "node": {
+                  "name": {
+                    "full": "Kentarou Miura"
+                  }
+                }
+              },
+              {
+                "role": "Art",
+                "node": {
+                  "name": {
+                    "full": "Kouji Mori"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "id": 30021,
+          "type": "MANGA",
+          "format": "MANGA",
+          "title": {
+            "romaji": "DEATH NOTE",
+            "english": "Death Note",
+            "native": "デスノート"
+          },
+          "synonyms": [],
+          "startDate": {
+            "year": 2003,
+            "month": 12,
+            "day": 1
+          },
+          "coverImage": {
+            "large": "https://s4.anilist.co/file/anilistcdn/media/manga/cover/large/bx30021-z86cokUz5rMh.jpg"
+          },
+          "episodes": null,
+          "chapters": 108,
+          "volumes": 12,
+          "description": "A notebook that kills anyone whose name is written in it falls into the hands of a top student.",
+          "isAdult": false,
+          "studios": {
+            "nodes": []
+          },
+          "staff": {
+            "edges": [
+              {
+                "role": "Story",
+                "node": {
+                  "name": {
+                    "full": "Tsugumi Ohba"
+                  }
+                }
+              },
+              {
+                "role": "Art",
+                "node": {
+                  "name": {
+                    "full": "Takeshi Obata"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "id": 30044,
+          "type": "MANGA",
+          "format": "MANGA",
+          "title": {
+            "romaji": "Planetes",
+            "english": "Planetes",
+            "native": "プラネテス"
+          },
+          "synonyms": [],
+          "startDate": {
+            "year": 1999,
+            "month": 1,
+            "day": 1
+          },
+          "coverImage": {
+            "large": "https://s4.anilist.co/file/anilistcdn/media/manga/cover/large/bx30044-xPLKKQAE3Gl0.jpg"
+          },
+          "episodes": null,
+          "chapters": 26,
+          "volumes": 4,
+          "description": "A space debris collector in 2075 dreams of the stars while cleaning up humanity's junk in orbit.",
+          "isAdult": false,
+          "studios": {
+            "nodes": []
+          },
+          "staff": {
+            "edges": [
+              {
+                "role": "Story & Art",
+                "node": {
+                  "name": {
+                    "full": "Makoto Yukimura"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "id": 118586,
+          "type": "MANGA",
+          "format": "MANGA",
+          "title": {
+            "romaji": "Sousou no Frieren",
+            "english": "Frieren: Beyond Journey’s End",
+            "native": "葬送のフリーレン"
+          },
+          "synonyms": [],
+          "startDate": {
+            "year": 2020,
+            "month": 4,
+            "day": 28
+          },
+          "coverImage": {
+            "large": "https://s4.anilist.co/file/anilistcdn/media/manga/cover/large/bx118586-F0Lp86XQV7du.jpg"
+          },
+          "episodes": null,
+          "chapters": null,
+          "volumes": null,
+          "description": "An elf mage who outlives her companions learns what their short time together meant.",
+          "isAdult": false,
+          "studios": {
+            "nodes": []
+          },
+          "staff": {
+            "edges": [
+              {
+                "role": "Story",
+                "node": {
+                  "name": {
+                    "full": "Kanehito Yamada"
+                  }
+                }
+              },
+              {
+                "role": "Art",
+                "node": {
+                  "name": {
+                    "full": "Tsukasa Abe"
+                  }
+                }
+              }
+            ]
+          }
+        }
+      ]
+    }
+  }
+}

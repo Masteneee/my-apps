@@ -333,3 +333,192 @@ Answers
    your id, so the row is refused.
 3. So the sample exercises the exact same code as the real API. If the converter breaks, sample mode
    breaks too, and the tests catch it.
+
+## Stage 3: Unified search (2026-11-05)
+
+### What we built
+One search bar for everything. Type `dune` and you get the Dune movie, the Dune book and the Dune games in
+one list; chips filter it to one type (All, Movies, Series, Anime, Manga, Books, Games). Four sources are
+behind it: TMDB (movies and series), AniList (anime and manga), Open Library (books) and IGDB (games).
+When the same thing is found twice (Spirited Away is a TMDB movie AND an AniList anime) it shows once.
+You can log any result: the form says "Want to read / Reading / Read" for books, "Want to play / Playing /
+Finished" for games, and the profile shows one poster section per type.
+
+Every source also has a **saved sample** of its real answers. TMDB and IGDB use it when their key is
+missing; AniList and Open Library (no key needed) use it when the live call fails; and
+`MEDIA_LOG_USE_SAMPLES=1` forces it everywhere. The search page lists which sources use samples, and why.
+
+### The plan we followed
+1. Move the Stage 2 TMDB code into `lib/sources/`, add series (`/search/tv`), and move the helpers every
+   source needs (cleaning text, friendly HTTP errors) into `shared.ts`.
+2. Write one `SourceAdapter` contract, then `anilist.ts`, `openlibrary.ts`, `igdb.ts`, each with a live
+   version and a sample version that go through the same converter.
+3. Write the merge rules as pure functions (`merge.ts`): take turns between types, merge duplicates, best
+   title matches first.
+4. Run all sources at once (`unified.ts`), choose live/sample from the env (`setup.ts`, `server.ts`), and
+   replace `/api/movies/search` with `/api/search`.
+5. Make the search page, the log form and the profile work for every type.
+6. Tests for every adapter (saved samples, fake `fetch`), the merging and the setup; then the docs.
+
+### New concepts
+
+**The adapter pattern (the big one).** A travel adapter lets a Canadian plug fit a European socket
+without changing either. Our adapters do the same with data: each one knows ONE outside API and converts
+its answers into our ONE shape, `MediaResult`. TMDB says `release_date`, IGDB says `first_release_date` in
+seconds, Open Library says `first_publish_year`; after the adapter, it's just `year` for everyone.
+
+**Why the adapter pattern matters HERE.** Without it, the search page, the merge rules, the log form and
+the database code would all need `if TMDB ... else if AniList ...` everywhere, and adding a fifth source
+(say, podcasts) would mean touching all of them. With it, everything after the adapters only knows
+`MediaResult`, and a new source = one new adapter file + one line in `setup.ts`. It also keeps each API's
+weirdness in one place: when IGDB changes a field name, only `igdb.ts` changes. And because every adapter
+has the same shape (`source`, `types`, `mode`, `search()`), the unified search can treat them all the same
+way, including the sample versions, which are just more adapters.
+
+**Interfaces as contracts (again).** `SourceAdapter` in `lib/sources/types.ts` is the same idea as
+`AuthService` (Stage 1) and `MediaStore` (Stage 2): a list of what something must offer, without saying
+how. TypeScript refuses an adapter that forgets `types` or returns the wrong thing from `search()`.
+
+**GraphQL (AniList).** A normal ("REST") API has one address per question (`/search/movie`,
+`/search/tv`). GraphQL has ONE address, and you POST a query listing exactly the fields you want; the
+answer has the same shape as the query. Two GraphQL tricks we use: **aliases** (`anime: Page(...)` and
+`manga: Page(...)` ask two questions in one request) and **variables** (`$search`), so the search text is
+never glued into the query text.
+
+**Escaping (and why gluing text is dangerous).** IGDB's query language puts the search text between
+double quotes: `search "zelda";`. If someone searches `say "hi"`, the quote in the middle would end the
+text early and break the query (or worse, add instructions of their own; that's how "injection" attacks
+work). `buildIgdbQuery` escapes it (`\"`). AniList avoids the problem entirely with variables, and
+`URLSearchParams` does the same job for TMDB and Open Library addresses.
+
+**Running things in parallel, and surviving failures.** `Promise.all([...])` starts all the searches at
+once and waits for all of them, so a search takes as long as the SLOWEST source, not the sum of all four.
+But `Promise.all` gives up as soon as one promise fails, so `searchOneSource` catches every error itself
+and returns it as a status instead. Result: if IGDB is down, you still get movies and books, plus a red
+"IGDB: ..." line.
+
+**Fallbacks ("graceful degradation").** When something fails, do the next best thing instead of showing
+nothing. AniList and Open Library fall back to their samples when the live call fails. TMDB and IGDB do
+NOT fall back when a key is set but wrong: hiding that would make you think your key works. The yellow
+note always says which sources use samples and why, so you're never fooled by fake-looking results.
+
+**Timeouts.** `AbortSignal.timeout(8000)` cancels a request after 8 seconds. Without it, one source that
+never answers would keep the whole search spinning forever.
+
+**Caching a token in memory (IGDB).** IGDB needs a temporary "access token" from Twitch, valid for about
+60 days. Asking for a new one on every search would be slow and rude. `createTwitchTokenProvider` keeps it
+in a variable and only asks again a minute before it expires. `server.ts` creates the provider OUTSIDE the
+request function, so it lives as long as the server process (a module is loaded once).
+
+**Your own Error class.** `class SourceError extends Error` is an Error with one extra field, `kind`
+("refused", "rate-limited", ...). `extends` means "everything an Error has, plus this". The IGDB adapter
+checks `err.kind === "refused"` to forget a bad token, which is safer than searching the message text
+(someone could reword the message one day).
+
+**Deduplication: deciding "same thing".** Two results are the same item if they share a title (ignoring
+case, accents, punctuation; the original title counts too), their types can match (same type, or anime vs
+TMDB movie/series), and they have the same year. Remakes (Dune 1984 vs 2021) differ by year, so both stay.
+When a year is missing we only merge with a shared creator (same author). When merging, the anime version
+wins (it has the episode count and studio) and blanks are filled from the other copy.
+
+**Ranking with a stable sort.** `matchScore` gives 3 for an exact title, 2 for "starts with", 1 for "has
+the word", 0 otherwise. Sorting by score keeps equal scores in their previous order (JavaScript's sort is
+"stable"), and that previous order is the type-by-type interleaving, so no source can flood the top.
+
+### New dependencies
+None. GraphQL is just a POST with JSON (no GraphQL library needed), and everything else uses `fetch`.
+
+### Files and what each one does
+- `lib/sources/types.ts` the `SourceAdapter` contract, search filters, `SourceStatus`, `UnifiedSearchResponse`.
+- `lib/sources/shared.ts` helpers every adapter uses: `cleanQuery`, `normalizeText`, `cleanYear` (follows the
+  database's 1800-2200 rule), `stripHtml`, `fetchJson` (friendly errors + timeout), `SourceError`.
+- `lib/sources/tmdb.ts` TMDB adapter: movies AND series now (was `lib/tmdb/` in Stage 2, moved and merged).
+- `lib/sources/anilist.ts` AniList adapter (GraphQL): anime and manga.
+- `lib/sources/openlibrary.ts` Open Library adapter: books.
+- `lib/sources/igdb.ts` IGDB adapter: games, plus the Twitch token step and its memory.
+- `lib/sources/samples/*.json` saved answers in each API's real shape: `tmdb-search-movie.json` (16 movies),
+  `tmdb-search-tv.json` (10 series), `anilist-search.json` (9 anime + 6 manga), `openlibrary-search.json`
+  (12 books), `igdb-games.json` (11 games).
+- `lib/sources/merge.ts` interleave by type, dedupe, rank by title match (pure functions).
+- `lib/sources/unified.ts` runs the right sources in parallel, handles failures and fallbacks, merges.
+- `lib/sources/setup.ts` env variables -> which version of each source (live, sample, fallback).
+- `lib/sources/server.ts` server-only: reads the env, keeps the IGDB token between searches.
+- `lib/sources/*.test.ts` tests for each adapter (saved samples + fake `fetch`, no live calls), shared
+  helpers, merging, the unified search and the setup.
+- `app/api/search/route.ts` `GET /api/search?q=...&type=...` (replaces `/api/movies/search`).
+- `components/MediaSearch.tsx` (was `MovieSearch.tsx`) filter chips, search box, sample/error notes,
+  results with type, creators and episodes/chapters/pages.
+- `components/LogMediaForm.tsx` (was `LogMovieForm.tsx`) the same form, with words for each type.
+- `components/ProfileView.tsx` one poster section per type. `components/PosterGrid.tsx` per-type status words.
+- `app/search/page.tsx` uses `MediaSearch`.
+- `lib/media/display.ts` `TYPE_LABELS`, `wordsFor`, `statusLabel`, `unitsLabel`, `groupByType` (replace
+  `MOVIE_STATUS_LABELS`). `lib/media/validation.ts` messages no longer say "watched" only.
+- `lib/media/*.test.ts` tests for the new helpers, and a demo-store test logging all six types.
+- `.env.example` new `IGDB_CLIENT_ID`, `IGDB_CLIENT_SECRET`, `MEDIA_LOG_USE_SAMPLES`.
+- Removed: `lib/tmdb/` (moved into `lib/sources/`), `app/api/movies/search/route.ts`.
+
+Tests: 185 in 14 files (93 before this stage).
+
+### Most important lines
+```ts
+search(query: string, options: SourceSearchOptions): Promise<MediaResult[]>;
+```
+In `lib/sources/types.ts`: the whole adapter pattern in one line. Whatever the API, the answer is a list
+of OUR type.
+
+```ts
+const answers = await Promise.all(active.map(({ entry, types }) => searchOneSource(entry, query, { types, limit }, warn)));
+```
+In `lib/sources/unified.ts`: all sources at once, and `searchOneSource` never throws, so one broken
+source can't hide the others.
+
+```ts
+if (a.year !== null && b.year !== null) return a.year === b.year;
+```
+In `lib/sources/merge.ts`: the line that keeps Dune (1984) and Dune (2021) apart while merging Spirited
+Away (2001) from TMDB and AniList.
+
+### Decisions
+- **Anime beats movie/series when merging.** Spirited Away appears once, as anime (AniList has the episode
+  count and studio). To log it as a movie instead, pick the **Movies** chip: AniList isn't asked then.
+- **A manga and its anime are never merged**, nor a book and its film: they're different things to log.
+- **Light novels are skipped from AniList** (`format_not: NOVEL`): they're books, and Open Library covers
+  books, so they'd be listed twice with different types.
+- **Keyed sources don't fall back on errors.** A wrong TMDB/IGDB key shows a red error instead of quietly
+  showing samples, so you notice and fix it.
+- **8 results per type with "All", 20 with one type**, so "All" stays readable.
+- **Years before 1800 become "unknown"** (the database refuses them): Don Quixote (1605) can still be
+  logged. Counts of 0 become unknown too (the database wants more than 0).
+- **Adult content is filtered where the API allows it:** AniList is asked `isAdult: false`, TMDB `include_adult=false`,
+  IGDB excludes the "Erotic" theme. Open Library has no such flag.
+- **Creators:** anime = main studio, manga = writer/artist (not translators), books = authors, games = the
+  developer (not the publisher). TMDB still has none (its search has no director).
+- **Sample data is from memory, not downloaded** (the build had no internet). The shapes follow each
+  API's documentation; ids, cover addresses and numbers may be slightly off, and the descriptions are
+  written by us. A broken cover just shows the title.
+- **Live calls are written but untested against the real APIs** (no internet here). They're tested with
+  fake `fetch` answers in the real shapes; try them once with internet and keys (see SETUP-NEEDED.md).
+- The old `/api/movies/search` route was removed rather than kept next to the new one: only our own page
+  used it.
+
+### Practice exercise
+Improve the merge rules: right now `isSameItem` thinks "The Hobbit" and "Hobbit" (same year, same author)
+are different books. In `lib/sources/merge.ts`, write a small function `withoutLeadingArticle`
+that turns `"the witcher"` into `"witcher"` (also `"a "` and `"an "`), and use it inside `titleKeys`. Then
+add a test in `merge.test.ts`: `isSameItem` of two books "The Hobbit" (1937, Tolkien) and "Hobbit" (1937,
+Tolkien) should be `true`. Run `npm test`. Bonus: does `matchScore("the hobbit", ...)` still give 3 for
+"The Hobbit"? Why?
+
+### Quiz
+1. Adding a podcast source next month: which files must change, and which must NOT?
+2. Why does `searchOneSource` catch errors instead of letting `Promise.all` see them?
+3. Why does the IGDB secret never appear in the request to `api.igdb.com`?
+
+Answers
+1. A new `lib/sources/podcasts.ts` adapter (+ its sample and tests), one line in `setup.ts`, and `"podcast"`
+   in `MEDIA_TYPES`/`MEDIA_SOURCES` (+ the database `check` rules and the words in `display.ts`). The
+   search page, the merge rules and the stores don't change: they only know `MediaResult`.
+2. `Promise.all` fails as a whole as soon as ONE promise fails, so one broken source would hide every
+   other source's results. Caught errors become a status line instead.
+3. The secret is only sent to Twitch to get a temporary token. IGDB receives the client id and that token.
+   If the token leaked, it would expire; the secret would not.

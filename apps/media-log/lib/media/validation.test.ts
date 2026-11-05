@@ -130,7 +130,7 @@ describe("validateLogInput", () => {
   it("allows today but not the future as the watched date", () => {
     expect(validateLogInput({ ...base, finishedAt: TODAY }, TODAY).ok).toBe(true);
     const future = validateLogInput({ ...base, finishedAt: "2026-11-06" }, TODAY);
-    expect(future).toEqual({ ok: false, error: "The watched date can't be in the future." });
+    expect(future).toEqual({ ok: false, error: "The finished date can't be in the future." });
     expect(validateLogInput({ ...base, finishedAt: "2026-02-30" }, TODAY).ok).toBe(false);
   });
 

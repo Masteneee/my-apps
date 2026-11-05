@@ -1,10 +1,12 @@
 "use client";
-// The "log this movie" form: status, rating, review, watched date, rewatch.
+// The "log this" form: status, rating, review, finished date, rewatch.
+// It works for every media type; only the words change ("Watched" for a
+// movie, "Read" for a book, "Finished" for a game), see wordsFor().
 // The rules (rating in half steps, no rating for "Want to watch"...) live in
 // lib/media/validation.ts; the store checks them and throws a friendly error.
 
 import { useState } from "react";
-import { MOVIE_STATUS_LABELS, ratingToStars } from "@/lib/media/display";
+import { ratingToStars, TYPE_LABELS, unitsLabel, wordsFor } from "@/lib/media/display";
 import { getMediaStore, type LogStatus, type LogWithMedia, type MediaResult } from "@/lib/media";
 import { LOG_STATUSES } from "@/lib/media/types";
 import { localToday, RATING_OPTIONS, REVIEW_MAX } from "@/lib/media/validation";
@@ -16,7 +18,7 @@ type Props = {
   onCancel: () => void;
 };
 
-export function LogMovieForm({ media, onSaved, onCancel }: Props) {
+export function LogMediaForm({ media, onSaved, onCancel }: Props) {
   const [status, setStatus] = useState<LogStatus>("completed");
   const [rating, setRating] = useState<number | null>(null);
   const [review, setReview] = useState("");
@@ -25,8 +27,10 @@ export function LogMovieForm({ media, onSaved, onCancel }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const watched = status === "completed";
+  const words = wordsFor(media.type);
+  const finished = status === "completed";
   const canRate = status !== "planned";
+  const details = [media.creators.join(", "), unitsLabel(media.type, media.totalUnits)].filter(Boolean).join(" · ");
 
   function changeStatus(next: LogStatus) {
     setStatus(next);
@@ -44,7 +48,7 @@ export function LogMovieForm({ media, onSaved, onCancel }: Props) {
         status,
         rating,
         reviewText: review,
-        finishedAt: watched && finishedAt ? finishedAt : null,
+        finishedAt: finished && finishedAt ? finishedAt : null,
         rewatch,
       });
       onSaved(log);
@@ -61,11 +65,12 @@ export function LogMovieForm({ media, onSaved, onCancel }: Props) {
           <Poster src={media.coverUrl} title={media.title} />
         </div>
         <div className="min-w-0">
-          <p className="text-sm text-zinc-400">Log a movie</p>
+          <p className="text-sm text-zinc-400">Log this {TYPE_LABELS[media.type].one.toLowerCase()}</p>
           <h2 className="text-xl font-bold sm:text-2xl">
             {media.title} {media.year && <span className="font-normal text-zinc-400">({media.year})</span>}
           </h2>
           {media.originalTitle && <p className="text-sm text-zinc-500">{media.originalTitle}</p>}
+          {details && <p className="mt-1 text-sm text-zinc-400">{details}</p>}
         </div>
       </div>
 
@@ -91,7 +96,7 @@ export function LogMovieForm({ media, onSaved, onCancel }: Props) {
                 onChange={() => changeStatus(value)}
                 className="sr-only"
               />
-              {MOVIE_STATUS_LABELS[value]}
+              {words.statuses[value]}
             </label>
           ))}
         </div>
@@ -117,13 +122,13 @@ export function LogMovieForm({ media, onSaved, onCancel }: Props) {
               </option>
             ))}
           </select>
-          {!canRate && <p className="mt-1 text-xs text-zinc-500">Rate it once you&apos;ve watched it.</p>}
+          {!canRate && <p className="mt-1 text-xs text-zinc-500">Rate it once you&apos;ve started it.</p>}
         </div>
 
-        {watched && (
+        {finished && (
           <div>
             <label htmlFor="finished-at" className="block text-sm font-medium text-zinc-300">
-              Watched on <span className="text-zinc-500">(optional)</span>
+              {words.finishedOn} <span className="text-zinc-500">(optional)</span>
             </label>
             <input
               id="finished-at"
@@ -137,7 +142,7 @@ export function LogMovieForm({ media, onSaved, onCancel }: Props) {
         )}
       </div>
 
-      {watched && (
+      {finished && (
         <label className="mt-4 flex items-center gap-2 text-sm text-zinc-300">
           <input
             type="checkbox"
@@ -145,7 +150,7 @@ export function LogMovieForm({ media, onSaved, onCancel }: Props) {
             onChange={(e) => setRewatch(e.target.checked)}
             className="h-4 w-4 accent-violet-500"
           />
-          I&apos;ve seen it before (rewatch)
+          {words.again}
         </label>
       )}
 

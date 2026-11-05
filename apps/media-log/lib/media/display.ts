@@ -11,19 +11,78 @@ export function ratingToStars(rating: number | null): string {
   return "★".repeat(full) + (half ? "½" : "");
 }
 
-// Words for each status, as a movie fan would say them. Stage 3 will add
-// words for other types ("Reading", "Playing"...).
-export const MOVIE_STATUS_LABELS: Record<LogStatus, string> = {
-  planned: "Want to watch",
-  in_progress: "Watching",
-  completed: "Watched",
-  dropped: "Dropped",
-  paused: "Paused",
+/** The name of each media type, for one item and for several. */
+export const TYPE_LABELS: Record<MediaType, { one: string; many: string }> = {
+  movie: { one: "Movie", many: "Movies" },
+  series: { one: "Series", many: "Series" },
+  anime: { one: "Anime", many: "Anime" },
+  manga: { one: "Manga", many: "Manga" },
+  book: { one: "Book", many: "Books" },
+  game: { one: "Game", many: "Games" },
 };
 
+/** The words that change with the kind of media: you WATCH a movie, READ a book, PLAY a game. */
+export type MediaWords = {
+  statuses: Record<LogStatus, string>;
+  finishedOn: string; // label of the date field
+  again: string; // label of the "rewatch" checkbox
+};
+
+const WATCH: MediaWords = {
+  statuses: { planned: "Want to watch", in_progress: "Watching", completed: "Watched", dropped: "Dropped", paused: "Paused" },
+  finishedOn: "Watched on",
+  again: "I've seen it before (rewatch)",
+};
+const READ: MediaWords = {
+  statuses: { planned: "Want to read", in_progress: "Reading", completed: "Read", dropped: "Dropped", paused: "Paused" },
+  finishedOn: "Finished on",
+  again: "I've read it before (reread)",
+};
+const PLAY: MediaWords = {
+  statuses: { planned: "Want to play", in_progress: "Playing", completed: "Finished", dropped: "Dropped", paused: "Paused" },
+  finishedOn: "Finished on",
+  again: "I've played it before (replay)",
+};
+
+// Record<MediaType, ...> makes TypeScript complain if a new type is added without words.
+const WORDS_BY_TYPE: Record<MediaType, MediaWords> = {
+  movie: WATCH,
+  series: WATCH,
+  anime: WATCH,
+  manga: READ,
+  book: READ,
+  game: PLAY,
+};
+
+export function wordsFor(type: MediaType): MediaWords {
+  return WORDS_BY_TYPE[type];
+}
+
+/** "completed" -> "Watched" for a movie, "Read" for a book, "Finished" for a game. */
+export function statusLabel(status: LogStatus, type: MediaType): string {
+  return WORDS_BY_TYPE[type].statuses[status];
+}
+
+// What `total_units` counts for each type (null = nothing to count).
+const UNIT_WORDS: Record<MediaType, [string, string] | null> = {
+  movie: null,
+  series: ["episode", "episodes"],
+  anime: ["episode", "episodes"],
+  manga: ["chapter", "chapters"],
+  book: ["page", "pages"],
+  game: null,
+};
+
+/** 24 for an anime -> "24 episodes", 1 -> "1 episode". Null when unknown or not counted. */
+export function unitsLabel(type: MediaType, totalUnits: number | null): string | null {
+  const words = UNIT_WORDS[type];
+  if (!words || totalUnits === null) return null;
+  return `${totalUnits} ${totalUnits === 1 ? words[0] : words[1]}`;
+}
+
 /**
- * You can log the same movie several times (a rewatch is a new diary entry).
- * The poster grid should show each movie once, with your MOST RECENT log.
+ * You can log the same item several times (a rewatch is a new diary entry).
+ * The poster grid should show each item once, with your MOST RECENT log.
  * Expects `logs` newest first (that's what getLogsForUser returns).
  */
 export function latestLogPerItem(logs: LogWithMedia[]): LogWithMedia[] {
@@ -45,4 +104,14 @@ export function countByType(logs: LogWithMedia[]): Record<MediaType, number> {
     counts[log.media.type] += 1;
   }
   return counts;
+}
+
+/**
+ * Splits logs into one group per media type (Movies, Series, Anime...), in
+ * the usual type order, skipping empty types. Each group keeps the logs' order.
+ */
+export function groupByType(logs: LogWithMedia[]): { type: MediaType; logs: LogWithMedia[] }[] {
+  return MEDIA_TYPES.map((type) => ({ type, logs: logs.filter((log) => log.media.type === type) })).filter(
+    (group) => group.logs.length > 0,
+  );
 }
