@@ -27,13 +27,19 @@ export const MOCK_STORAGE_KEY = "wellbeing-app:mock-db";
 
 const emptyDatabase = (): MockDatabase => ({ users: [], profiles: [], currentUserId: null });
 
-/** An in-memory stand-in for localStorage (used in tests and on the server). */
-export function createMemoryStorage(): KeyValueStorage {
+/**
+ * An in-memory stand-in for localStorage (used in tests and on the server).
+ * Stage 2: also has removeItem, which the offline queue (lib/checkin/offline.ts) uses.
+ */
+export function createMemoryStorage(): Pick<Storage, "getItem" | "setItem" | "removeItem"> {
   const data = new Map<string, string>();
   return {
     getItem: (key) => data.get(key) ?? null,
     setItem: (key, value) => {
       data.set(key, value);
+    },
+    removeItem: (key) => {
+      data.delete(key);
     },
   };
 }

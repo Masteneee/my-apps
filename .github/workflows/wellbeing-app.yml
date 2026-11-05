@@ -31,7 +31,7 @@ jobs:
       - run: npm ci
       # ESLint: common mistakes in React/TypeScript code.
       - run: npm run lint
-      # Vitest: the logic tests in lib/ (auth, profile cache, service worker, manifest).
+      # Vitest: the logic tests in lib/ (auth, check-in, service worker, manifest).
       - run: npm test
       # The build also type-checks every file. No Supabase keys here, so it
       # builds in demo mode, which is exactly what we want to check.

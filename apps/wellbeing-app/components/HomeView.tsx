@@ -2,16 +2,17 @@
 // The home page. What it shows depends on who is looking:
 // - signed out       -> a short welcome with "Create an account" / "Log in"
 // - no username yet  -> sent to /onboarding
-// - signed in        -> "Today": an empty state until the check-in (Stage 2)
+// - signed in        -> "Today": the check-in card (Stage 2) and streaks (Stage 3)
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { greetingFor, nameToShow } from "@/lib/home/greeting";
 import { useAuth } from "./AuthProvider";
+import { TodayCheckinCard } from "./TodayCheckinCard";
 import { buttonPrimary, buttonSecondary, card } from "./ui";
 
-// What the daily check-in will cover (Stage 2). Shown on the welcome screen.
+// What the daily check-in covers. Shown on the welcome screen.
 const CHECKIN_PARTS = ["Mood", "Screen time", "3 gratitudes", "A short journal", "Your habits"];
 
 export function HomeView() {
@@ -55,15 +56,7 @@ export function HomeView() {
         </h1>
       </header>
 
-      <section className={card}>
-        <h2 className="font-semibold">Today&apos;s check-in</h2>
-        <p className="mt-1 text-sm text-muted">
-          Coming soon: about 5 minutes for your mood, screen time, three gratitudes, a short journal and your habits.
-        </p>
-        <button type="button" disabled className={`mt-4 ${buttonPrimary}`}>
-          Start check-in (soon)
-        </button>
-      </section>
+      <TodayCheckinCard />
 
       <section className={card}>
         <h2 className="font-semibold">Streaks</h2>

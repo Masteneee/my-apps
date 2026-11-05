@@ -33,9 +33,12 @@ const STATIC_CACHE = `${CACHE_PREFIX}static-${CACHE_VERSION}`;
 
 // The "app shell": pages saved in advance, when the service worker installs,
 // so they open offline even if you never visited them.
-// Stage 2: add "/checkin" here so the daily check-in opens offline.
+// Stage 2: "/checkin" (the daily check-in) and "/habits" (add/archive habits).
+// They are page SHELLS, the same for everyone: your answers are never in here.
 const APP_SHELL = [
   "/",
+  "/checkin",
+  "/habits",
   "/login",
   "/signup",
   "/onboarding",
@@ -65,8 +68,9 @@ const OFFLINE_PAGE = "/offline";
  * so tests can call this without a real browser Request.
  */
 function chooseStrategy(request, appOrigin) {
-  // Only GET requests are "reading". POST/PUT/DELETE change data (Stage 2's
-  // "save my check-in") and must always reach the server, never a cache.
+  // Only GET requests are "reading". POST/PUT/DELETE change data ("save my
+  // check-in") and must always reach the server, never a cache. (Saving while
+  // offline is handled by the app itself: lib/checkin/offline.ts.)
   if (request.method !== "GET") return "skip";
 
   const url = new URL(request.url);

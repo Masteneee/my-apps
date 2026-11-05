@@ -13,7 +13,7 @@ describe("chooseStrategy", () => {
   it("opens pages network-first, with the offline page as a fallback", () => {
     expect(sw.chooseStrategy(req("/", { mode: "navigate" }), APP)).toBe("page");
     expect(sw.chooseStrategy(req("/profile", { mode: "navigate" }), APP)).toBe("page");
-    // Stage 2's check-in page is covered automatically, no change needed:
+    // The check-in page (Stage 2) is covered by the same rule:
     expect(sw.chooseStrategy(req("/checkin", { mode: "navigate" }), APP)).toBe("page");
   });
 
@@ -27,7 +27,7 @@ describe("chooseStrategy", () => {
     expect(sw.chooseStrategy(req("/manifest.webmanifest"), APP)).toBe("network-first");
   });
 
-  it("never touches requests that change data (saving a check-in later)", () => {
+  it("never touches requests that change data (like saving a check-in)", () => {
     for (const method of ["POST", "PUT", "PATCH", "DELETE"]) {
       expect(sw.chooseStrategy(req("/", { method, mode: "cors" }), APP)).toBe("skip");
     }
@@ -126,6 +126,11 @@ describe("app shell", () => {
   it("saves the offline page and the home page in advance", () => {
     expect(sw.APP_SHELL).toContain(sw.OFFLINE_PAGE);
     expect(sw.APP_SHELL).toContain("/");
+  });
+
+  it("saves the daily check-in and the habits page in advance, so they open offline (Stage 2)", () => {
+    expect(sw.APP_SHELL).toContain("/checkin");
+    expect(sw.APP_SHELL).toContain("/habits");
   });
 
   it("only lists pages and files the strategy would actually serve", () => {
