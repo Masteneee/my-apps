@@ -3,7 +3,7 @@
 Legend: `[ ]` to do, `[x]` done, `[?]` needs my choice, `[!]` failed (reason noted)
 
 ## Status
-Not started.
+Done: shorts-blocker (3/3), wondered-site (4/4). Next: media-log Stage 1. Then wellbeing-app, then budget-app phases 0 to 3. workout-app and study-tools are for later.
 
 ## 1. shorts-blocker (Chrome extension)
 - [x] Stage 1: Skeleton + YouTube
