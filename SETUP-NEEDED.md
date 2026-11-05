@@ -9,4 +9,5 @@ Things only I (Amasten) can do: accounts, API keys, deploying, and choices the p
 - [ ] Twitch developer account for IGDB (games in media-log)
 
 ## Added during the build
-(nothing yet)
+- [ ] **shorts-blocker:** load it in Chrome (`chrome://extensions` > Developer mode > Load unpacked > `apps/shorts-blocker`) and run the README's "Test it by hand" steps. Selectors for Instagram/Facebook/Snapchat were never tested on the live sites.
+- [ ] **wondered-site:** click each source link in the 3 sample questions once to confirm it opens (the build couldn't reach the web).

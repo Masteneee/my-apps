@@ -1,0 +1,20 @@
+---
+import { getCollection } from 'astro:content';
+import Base from '../../layouts/Base.astro';
+import QuestionList from '../../components/QuestionList.astro';
+import { CATEGORIES, categoryLabel, inCategory, sortNewestFirst, type Category } from '../../lib/categories';
+
+// One page per category, even empty ones, so links on the home page never 404.
+export function getStaticPaths() {
+  return CATEGORIES.map((category) => ({ params: { category } }));
+}
+
+const category = Astro.params.category as Category;
+const questions = sortNewestFirst(inCategory(await getCollection('questions'), category));
+---
+<Base title={categoryLabel(category)}>
+  <h1 class="mb-6 text-3xl font-bold">{categoryLabel(category)}</h1>
+  {questions.length > 0
+    ? <QuestionList questions={questions} />
+    : <p class="text-slate-600">No questions here yet. More coming soon!</p>}
+</Base>

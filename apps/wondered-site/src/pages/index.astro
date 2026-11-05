@@ -1,0 +1,23 @@
+---
+import { getCollection } from 'astro:content';
+import Base from '../layouts/Base.astro';
+import QuestionList from '../components/QuestionList.astro';
+import { CATEGORIES, categoryLabel, sortNewestFirst } from '../lib/categories';
+
+// Runs once at build time, not in the visitor's browser.
+const questions = sortNewestFirst(await getCollection('questions'));
+---
+<Base title="Home">
+  <h1 class="mb-2 text-3xl font-bold">Have you ever wondered...?</h1>
+  <p class="mb-6 text-slate-600">Short, well-explained answers, STEM first.</p>
+
+  <section class="mb-8 flex flex-wrap gap-2">
+    {CATEGORIES.map((c) => (
+      <a href={`/category/${c}/`} class="rounded-full border border-slate-300 px-3 py-1 text-sm hover:bg-slate-100">
+        {categoryLabel(c)}
+      </a>
+    ))}
+  </section>
+
+  <QuestionList questions={questions} />
+</Base>

@@ -11,7 +11,7 @@ Not started.
 - [x] Stage 3: Polish + tests
 
 ## 2. wondered-site ("Have you ever wondered")
-- [ ] Stage 1: Skeleton + content system
+- [x] Stage 1: Skeleton + content system
 - [ ] Stage 2: Discovery
 - [ ] Stage 3: Video + interactivity
 - [ ] Stage 4: Ship it

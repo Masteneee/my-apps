@@ -1,0 +1,45 @@
+---
+// The square brackets make this a dynamic route: one template, many pages.
+import { getCollection, render } from 'astro:content';
+import Base from '../../layouts/Base.astro';
+import { categoryLabel } from '../../lib/categories';
+
+// For a static site, Astro must know every URL at build time.
+// We return one entry per .mdx file, so a new file = a new page automatically.
+export async function getStaticPaths() {
+  const questions = await getCollection('questions');
+  return questions.map((question) => ({
+    params: { slug: question.id },
+    props: { question },
+  }));
+}
+
+const { question } = Astro.props;
+const { title, category, short_answer, sources, date } = question.data;
+// render() turns the MDX body into a component we can place on the page.
+const { Content } = await render(question);
+---
+<Base title={title}>
+  <article>
+    <a href={`/category/${category}/`} class="text-sm uppercase tracking-wide text-slate-500 hover:underline">
+      {categoryLabel(category)}
+    </a>
+    <h1 class="mt-1 text-4xl font-bold">{title}</h1>
+    <p class="mt-4 rounded-lg bg-slate-100 p-4 text-lg"><strong>Short answer:</strong> {short_answer}</p>
+
+    <!-- Tailwind removes default heading/list styles, so we restyle MDX output here. -->
+    <div class="mt-6 space-y-4 leading-relaxed [&_h2]:mt-8 [&_h2]:text-2xl [&_h2]:font-semibold [&_ul]:list-disc [&_ul]:pl-6">
+      <Content />
+    </div>
+
+    <section class="mt-10 border-t border-slate-200 pt-4">
+      <h2 class="text-lg font-semibold">Sources</h2>
+      <ul class="mt-2 list-disc pl-6 text-sm">
+        {sources.map((url) => (
+          <li><a href={url} class="break-all text-blue-700 hover:underline" rel="noopener">{url}</a></li>
+        ))}
+      </ul>
+      <p class="mt-4 text-xs text-slate-500">Published {date.toISOString().slice(0, 10)}</p>
+    </section>
+  </article>
+</Base>
