@@ -187,7 +187,7 @@ export function ListView({ listId }: { listId: string }) {
             >
               <span className="w-7 shrink-0 text-center text-lg font-bold text-zinc-500">{index + 1}</span>
               <Link href={mediaItemPath(item.media)} className="w-12 shrink-0" draggable={false}>
-                <Poster src={item.media.cover_url} title={item.media.title} />
+                <Poster src={item.media.cover_url} title={item.media.title} sizes="48px" />
               </Link>
               <div className="min-w-0 flex-1">
                 <Link href={mediaItemPath(item.media)} className="font-medium hover:underline" draggable={false}>

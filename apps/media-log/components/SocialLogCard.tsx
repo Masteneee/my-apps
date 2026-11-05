@@ -60,7 +60,7 @@ export function SocialLogCard({ log, showMedia = true, onLikeChange }: Props) {
       </div>
       {showMedia && (
         <Link href={mediaItemPath(log.media)} className="w-12 shrink-0 sm:w-14">
-          <Poster src={log.media.cover_url} title={log.media.title} />
+          <Poster src={log.media.cover_url} title={log.media.title} sizes="56px" />
         </Link>
       )}
     </article>

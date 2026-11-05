@@ -6,6 +6,7 @@
 // keys, and anything sent to the browser can be read by anyone (DevTools).
 // Here the keys stay on the server: the browser asks us, we ask the sources.
 
+import { searchCacheControl } from "@/lib/sources/cache";
 import { getSourceEntries } from "@/lib/sources/server";
 import { parseSearchFilter, type UnifiedSearchResponse } from "@/lib/sources/types";
 import { unifiedSearch } from "@/lib/sources/unified";
@@ -16,5 +17,12 @@ export async function GET(request: Request) {
   const answer = await unifiedSearch(params.get("q") ?? "", parseSearchFilter(params.get("type")), getSourceEntries());
   // unifiedSearch never throws: a failing source shows up in answer.sources
   // with state "error" and a message written for users (never a key).
-  return Response.json(answer satisfies UnifiedSearchResponse);
+  //
+  // Stage 7: the Cache-Control header lets the browser (1 minute) and Vercel's
+  // CDN (1 hour) reuse this answer for the same URL, so a popular search doesn't
+  // even reach this code. Incomplete answers (a source failed) are never cached.
+  // See lib/sources/cache.ts.
+  return Response.json(answer satisfies UnifiedSearchResponse, {
+    headers: { "Cache-Control": searchCacheControl(answer) },
+  });
 }

@@ -2,24 +2,83 @@
 
 One place to log, rate and review everything you watch, read and play: movies, series, anime, manga,
 books and games. Think Letterboxd, but for every kind of media, with one profile. See `PLAN.md` for
-the full plan and `LEARNING.md` for what each stage taught.
+the full plan, `ARCHITECTURE.md` for how the code fits together, and `LEARNING.md` for what each stage taught.
 
-**Status:** Stage 6 (stats + bridge recommendations) done. One search bar finds movies and series (TMDB), anime and manga
-(AniList), books (Open Library) and games (IGDB), merged into one list without duplicates. You can log any
-of them with a status, rating, review and **progress** (episode 7/24, chapter 120/?, 45% of a book, 12.5
-hours in a game), see them grouped by type on your profile at `/u/username`, read your **diary** (every log,
-grouped by month) at `/u/username/diary`, and open any logged item's page at `/media/<type>/<source>-<id>`
-(cover, info, your log with a progress tracker, everyone's average rating, everyone's reviews).
+**Status:** all 7 stages done. Runs fully in **demo mode** (no keys, data in your browser) and is ready to deploy on
+Vercel with Supabase (see [Deploy to Vercel](#deploy-to-vercel)).
 
-**Social (Stage 5):** follow people, read your **feed** at `/feed` (what the people you follow logged and
-reviewed), **like** reviews, and make public or private **lists** at `/u/username/lists` that you reorder by
-dragging (or with ↑ ↓ buttons on phones and keyboards). In demo mode, the feed page can add 3 clearly labeled
-**demo people** so there's someone to follow.
+## The gap
 
-**Stats + recommendations (Stage 6):** every profile has a **stats** page at `/u/username/stats` (count per media
-type, rating distribution, top genres, a yearly recap). Signed in, the home page shows **Bridge picks** (anime, manga
-and games for people who mostly log movies, series and books) and **More for you** (other media types). Every pick
-says why: "Because you rated Interstellar 5★: shares Sci-Fi, Adventure, Drama". Item pages show the item's tags.
+Letterboxd is movies only. AniList and MyAnimeList are anime and manga only. Goodreads is books only. Backloggd is games
+only. Nobody puts all of them in **one profile with one taste**, so nobody can tell you "you loved *Interstellar*, try the
+manga *Planetes*". Media Log does, and uses it on purpose: its **bridge picks** show anime, manga and games to people who
+mostly log movies, series and books, so niche media reaches people who only use mainstream apps.
+
+## Features
+
+- **One search for 6 media types:** TMDB (movies, series), AniList (anime, manga), Open Library (books) and IGDB (games),
+  asked in parallel, merged into one list without duplicates (*Spirited Away* shows once, as an anime).
+- **Logs:** status, half-star rating, review, "watched on" date, rewatch, and **progress** in the right unit (episode
+  7/24, chapter 120/?, 45% of a book, 12.5 hours in a game).
+- **Profile, diary, item pages:** a poster grid per type at `/u/<name>`, every log grouped by month in the diary, and an
+  item page with everyone's average rating and reviews.
+- **Social:** follow people, a feed of what they logged, likes on reviews, public or private **lists** with
+  drag-to-reorder (and keyboard buttons).
+- **Stats:** count per type, rating distribution, top genres, a yearly recap.
+- **Bridge picks:** rule-based, explainable cross-media recommendations ("Because you rated Arrival 4.5★: shares
+  Sci-Fi, Mystery"). No AI model.
+- **Fast and cheap to run:** covers resized by `next/image`, source answers cached for an hour, search answers cached
+  by Vercel's CDN.
+
+## Screenshots
+
+Taken in demo mode, logged in as the demo person Leo. Covers come from the sources' websites, which weren't
+reachable when these were taken, so each cover shows its title instead (online, real posters appear).
+
+| Bridge picks on the home page | One search, every media type |
+|---|---|
+| ![Bridge picks: Cowboy Bebop, Outer Wilds and Planetes, each with the reason](docs/screenshots/1-bridge-picks.png) | ![Searching "dune" finds the movie, the book and the game](docs/screenshots/2-search.png) |
+| **Stats page** | **Feed** |
+| ![Stats: count per type, ratings, top genres, 2026 recap](docs/screenshots/3-stats.png) | ![Feed with reviews, progress and likes](docs/screenshots/4-feed.png) |
+
+## Architecture
+
+```mermaid
+flowchart LR
+  subgraph Browser
+    Pages["Pages + components<br/>(app/, components/)"]
+    Store["getMediaStore() / getAuthService()<br/>(lib/media, lib/auth)"]
+    LS[("localStorage<br/>demo mode")]
+  end
+  subgraph Vercel["Vercel (Next.js server)"]
+    CDN["CDN cache<br/>(Cache-Control)"]
+    API["/api/search<br/>(app/api/search/route.ts)"]
+    Unified["unifiedSearch + merge<br/>(lib/sources)"]
+    DataCache[("Next.js Data Cache<br/>1 hour")]
+    Img["/_next/image<br/>(cover resizing)"]
+  end
+  subgraph Sources["Outside APIs"]
+    TMDB[TMDB]
+    AniList[AniList]
+    OL[Open Library]
+    IGDB[IGDB]
+  end
+  Supabase[("Supabase<br/>Postgres + Auth + RLS")]
+
+  Pages --> Store
+  Store -- "keys set" --> Supabase
+  Store -- "no keys" --> LS
+  Pages -- "fetch /api/search?q=" --> CDN
+  CDN --> API
+  API --> Unified
+  Unified -- "one adapter per source" --> DataCache
+  DataCache --> TMDB & AniList & OL & IGDB
+  Pages -- "covers" --> Img --> Sources
+```
+
+The browser talks to Supabase directly (Row Level Security decides what each user may read and write) and to our
+server only for search, because TMDB and IGDB need secret keys. `ARCHITECTURE.md` explains every folder and follows one
+search from the keyboard to the screen.
 
 ## Run it
 
@@ -107,6 +166,52 @@ No key needed. When a live call fails (offline, the site is down, rate limit), t
 that source's saved sample and the page says "couldn't reach it". The terminal running `npm run dev` logs
 the reason. Set `MEDIA_LOG_USE_SAMPLES=1` in `.env.local` to force samples for **every** source (handy
 offline).
+
+## Deploy to Vercel
+
+Nothing to configure in code: Vercel recognises Next.js by itself, so there is no `vercel.json`. Do the
+"Connect a real Supabase project" steps above first (all 5 migrations).
+
+1. Push the repo to GitHub. On vercel.com (free Hobby plan, log in with GitHub): **Add New > Project**, import `my-apps`.
+2. **Root Directory:** `apps/media-log` (the repo holds several apps). Framework: Next.js (detected). Leave the build
+   and install commands as they are.
+3. **Environment Variables** (Production, and Preview if you want preview links to work too):
+
+   | Name | Value | Needed? |
+   |------|-------|---------|
+   | `NEXT_PUBLIC_SUPABASE_URL` | Supabase > Project Settings > API > Project URL | yes (without it the site runs in demo mode) |
+   | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | the anon / publishable key (never `service_role`) | yes |
+   | `TMDB_READ_ACCESS_TOKEN` (or `TMDB_API_KEY`) | from themoviedb.org | for real movie/series search |
+   | `IGDB_CLIENT_ID`, `IGDB_CLIENT_SECRET` | from dev.twitch.tv | for real game search |
+   | `MEDIA_LOG_USE_SAMPLES` | leave unset | only for offline testing |
+
+   `NEXT_PUBLIC_` values are copied into the browser code **at build time**: after changing them, redeploy
+   (Deployments > ⋯ > Redeploy).
+4. **Deploy.** You get a URL like `https://media-log-xyz.vercel.app`.
+5. In Supabase, Authentication > URL Configuration: set **Site URL** to that URL and add `<that URL>/onboarding` to
+   **Redirect URLs** (keep the localhost ones for development). Without this, confirmation emails link to localhost.
+6. Google login (optional): nothing changes in Google Cloud (its redirect URI is the Supabase one).
+7. Check: open the URL, no yellow demo strip; sign up, confirm, pick a username; search `amélie` (not in the samples).
+
+Every push to GitHub then redeploys by itself (GitHub Actions keeps checking lint, tests and build on each push).
+Free-plan note: Vercel's free plan has a monthly limit on image optimizations. Covers are cached 30 days
+(`next.config.ts`), so each cover is only resized once per size.
+
+## Seed the demo account (real logs, for visitors)
+
+`supabase/seed/demo-account.sql` fills ONE account with 15 logs of well-known titles (Interstellar, Breaking Bad,
+Project Hail Mary, Frieren, The Witcher 3...), reviews, progress, finished dates over two years and a public list
+"Space, in every format". Run it once Supabase exists:
+
+1. In the deployed app, sign up with an email you control and pick the username **`demo`**. Confirm the email.
+2. Supabase > SQL Editor > New query > paste the whole file > **Run**. It says "Done: 15 logs and 1 list for demo".
+3. Open `/u/demo`, `/u/demo/diary`, `/u/demo/stats` and `/u/demo/lists`. Log in as `demo` and open the home page:
+   bridge picks appear.
+
+It only touches the account named at the top of the file (`v_username`). If that account already has logs it stops
+and changes nothing; set `v_replace := true` to rewrite them. It contains no keys or passwords. In **demo mode** the
+same idea is the **Add demo people** button on `/feed`; log in as `leo@demo.test` / `demo-password` for the fullest
+profile (that's how the screenshots were taken).
 
 ## Test it by hand (demo mode)
 1. `npm run dev`, open http://localhost:3000, click **Sign up**.
@@ -197,6 +302,16 @@ offline).
     manga or games" instead of bridge picks (More for you stays). Log out: the home page shows no picks at all.
 36. At phone width, the stats cards stack in one column and the picks in one column, nothing overflows.
 
+37. **Stage 7 showcase.** Reset the demo data, sign up, press **Add demo people** on `/feed`, log out and log in as
+    `leo@demo.test` / `demo-password`. Home page: bridge picks (Cowboy Bebop, Outer Wilds, Planetes) with reasons.
+    `/u/demo_leo`: 5 movies, 2 series, 1 anime, 1 book. `/u/demo_leo/stats`: year buttons **2026** and **2025**. His
+    lists: "Space, in every format" with a movie, a book, a manga, an anime and a game.
+38. **Images.** With internet, open `/u/demo_leo`, DevTools > Network > Img: covers come from `/_next/image?url=...&w=...`
+    as `webp` or `avif`, smaller than the original files. Offline, each cover shows its title (same as before).
+39. **Search cache.** `npm run build && npm start`, then in another terminal
+    `curl -I "http://localhost:3000/api/search?q=dune&type=all"`: `cache-control: public, max-age=60, s-maxage=3600, ...`.
+    Offline without `MEDIA_LOG_USE_SAMPLES=1`, AniList fails and the same command says `cache-control: no-store`.
+
 To reset demo data: DevTools > Application > Local Storage > delete `media-log:mock-db` (accounts, including
 the demo people) and `media-log:mock-media` (logs, follows, likes, lists).
 
@@ -227,7 +342,13 @@ lib/sources/         one adapter per search source (tmdb, anilist, openlibrary, 
                      catalog for recommendations (catalog.ts) (+ tests)
 lib/supabase/        the one shared Supabase client
 supabase/migrations/ SQL to paste into Supabase, in filename order
+supabase/seed/       Stage 7: demo-account.sql, real logs for one account (run once, by hand)
+docs/screenshots/    the README screenshots
 ```
+
+Stage 7 also added `lib/media/covers.ts` (the 4 cover hosts `next/image` may resize, shared with `next.config.ts`) and
+`lib/sources/cache.ts` (1-hour caching of source calls and the `Cache-Control` header of `/api/search`). See
+`ARCHITECTURE.md` for every folder.
 
 Pages never import Supabase directly: they call `getAuthService()` from `lib/auth` and `getMediaStore()`
 from `lib/media`, which return the Supabase versions when both `NEXT_PUBLIC_SUPABASE_URL` and

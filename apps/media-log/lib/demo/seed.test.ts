@@ -3,6 +3,9 @@ import { createMemoryStorage, createMockAuthService, type KeyValueStorage } from
 import type { AuthService } from "../auth/types";
 import { createMockMediaStore } from "../media/mock";
 import type { MediaStore } from "../media/types";
+import { bridgeAudience } from "../media/recommend";
+import { recapYears } from "../media/stats";
+import { MEDIA_TYPES } from "../media/types";
 import { mediaItemFields } from "../media/validation";
 import { convertAniListResponse } from "../sources/anilist";
 import { convertIgdbResponse } from "../sources/igdb";
@@ -102,6 +105,34 @@ describe("seedDemoPeople", () => {
       "Planetes",
       "Fullmetal Alchemist: Brotherhood",
     ]);
+  });
+
+  it("makes Leo a full showcase profile (Stage 7)", async () => {
+    seedDemoPeople(storage, NOW);
+    const leo = await auth.getProfileByUsername("demo_leo");
+    const logs = await store.getLogsForUser(leo!.id);
+
+    expect(logs.length).toBeGreaterThanOrEqual(8);
+    // Mostly movies, series and books: logging in as Leo shows bridge picks.
+    expect(bridgeAudience(logs).status).toBe("ok");
+    // Finished dates over two years: the stats page shows a year button.
+    expect(recapYears(logs)).toEqual([2026, 2025]);
+    // Reviews and progress, so the diary and item pages have something to show.
+    expect(logs.filter((log) => log.review_text).length).toBeGreaterThanOrEqual(3);
+    expect(logs.some((log) => log.progress_unit === "percent")).toBe(true);
+
+    // His list mixes media types: the app's whole idea in one page.
+    const [list] = await store.getListsForUser(leo!.id);
+    expect(new Set(list.items.map((item) => item.media.type)).size).toBeGreaterThanOrEqual(4);
+  });
+
+  it("covers every media type across the demo people", async () => {
+    seedDemoPeople(storage, NOW);
+    const types = new Set<string>();
+    for (const person of DEMO_PEOPLE) {
+      for (const log of await store.getLogsForUser(person.id)) types.add(log.media.type);
+    }
+    expect([...types].sort()).toEqual([...MEDIA_TYPES].sort());
   });
 
   it("lets you log in as a demo person", async () => {

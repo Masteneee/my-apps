@@ -74,7 +74,7 @@ export function DiaryView({ username }: { username: string }) {
                   {/* The day of the month, like a calendar page. */}
                   <span className="w-8 shrink-0 text-center text-xl font-bold text-zinc-500">{day}</span>
                   <Link href={mediaItemPath(log.media)} className="w-10 shrink-0 sm:w-12">
-                    <Poster src={log.media.cover_url} title={log.media.title} />
+                    <Poster src={log.media.cover_url} title={log.media.title} sizes="48px" />
                   </Link>
                   <div className="min-w-0 flex-1">
                     <Link href={mediaItemPath(log.media)} className="font-medium hover:underline">

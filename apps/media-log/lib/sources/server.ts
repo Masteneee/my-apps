@@ -7,6 +7,7 @@
 // copies NEXT_PUBLIC_ variables into browser code.
 import "server-only";
 
+import { withRevalidate } from "./cache";
 import { createTwitchTokenProvider, type IgdbCredentials, type TokenProvider } from "./igdb";
 import { createSourceEntries } from "./setup";
 import type { SourceEntry } from "./unified";
@@ -17,6 +18,8 @@ let igdbTokens: { clientId: string; provider: TokenProvider } | null = null;
 
 function igdbTokenProviderFor(credentials: IgdbCredentials): TokenProvider {
   // A new client id (you changed .env.local) gets a new provider.
+  // It uses the PLAIN fetch on purpose: the token request carries the client
+  // secret, and the token is already remembered in memory (see igdb.ts).
   if (igdbTokens?.clientId !== credentials.clientId) {
     igdbTokens = { clientId: credentials.clientId, provider: createTwitchTokenProvider(credentials) };
   }
@@ -34,6 +37,8 @@ export function getSourceEntries(): SourceEntry[] {
       IGDB_CLIENT_SECRET: process.env.IGDB_CLIENT_SECRET,
       MEDIA_LOG_USE_SAMPLES: process.env.MEDIA_LOG_USE_SAMPLES,
     },
-    { igdbTokens: igdbTokenProviderFor },
+    // Stage 7: every search call to a source is cached by Next.js for 1 hour
+    // (see cache.ts). The same search twice = one call to TMDB, not two.
+    { fetchFn: withRevalidate(fetch), igdbTokens: igdbTokenProviderFor },
   );
 }

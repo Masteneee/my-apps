@@ -76,7 +76,7 @@ export function LogMediaForm({ media, onSaved, onCancel, cancelLabel = "Back to 
     <form onSubmit={handleSubmit} className="rounded-lg border border-zinc-800 bg-zinc-900 p-5 sm:p-6">
       <div className="flex gap-4">
         <div className="w-20 shrink-0 sm:w-28">
-          <Poster src={media.coverUrl} title={media.title} />
+          <Poster src={media.coverUrl} title={media.title} sizes="112px" />
         </div>
         <div className="min-w-0">
           <p className="text-sm text-zinc-400">Log this {TYPE_LABELS[media.type].one.toLowerCase()}</p>

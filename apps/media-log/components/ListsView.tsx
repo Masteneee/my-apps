@@ -89,7 +89,7 @@ export function ListsView({ username }: { username: string }) {
                 {/* The first 4 covers, side by side, like a Letterboxd list preview. */}
                 <div className="grid grid-cols-4 gap-1.5">
                   {list.items.slice(0, 4).map((item) => (
-                    <Poster key={item.media_item_id} src={item.media.cover_url} title={item.media.title} />
+                    <Poster key={item.media_item_id} src={item.media.cover_url} title={item.media.title} sizes="(min-width: 640px) 120px, 25vw" />
                   ))}
                 </div>
                 <h2 className="mt-3 font-semibold">{list.title}</h2>

@@ -142,7 +142,7 @@ export function MediaItemView({ itemRef }: { itemRef: MediaItemRef }) {
       {/* Header: cover + info. Stacks on phones, side by side from 640px up. */}
       <section className="flex flex-col gap-6 sm:flex-row">
         <div className="mx-auto w-40 shrink-0 sm:mx-0 sm:w-48">
-          <Poster src={item.cover_url} title={item.title} />
+          <Poster src={item.cover_url} title={item.title} sizes="192px" eager />
         </div>
         <div className="min-w-0">
           <p className="text-xs font-medium tracking-wide text-violet-300 uppercase">{TYPE_LABELS[item.type].one}</p>

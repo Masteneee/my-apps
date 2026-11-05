@@ -4,7 +4,7 @@
 // The /feed page shows an "Add demo people" button in demo mode. It calls
 // seedDemoPeople(), which adds to the two demo "databases" in localStorage:
 // - the accounts and profiles (media-log:mock-db, see lib/auth/mock.ts)
-// - their logs, reviews, likes, follows and one list (media-log:mock-media)
+// - their logs, reviews, likes, follows and two lists (media-log:mock-media)
 //
 // Everyone is clearly labeled: usernames start with "demo_", display names end
 // with "(demo)", and the bio says it's not a real person. You can even log in
@@ -19,6 +19,9 @@ import type { Log, LogStatus, MediaItem, ProgressUnit } from "../media/types";
 import { validateLogInput, localToday, mediaItemToResult } from "../media/validation";
 
 export const DEMO_PASSWORD = "demo-password";
+
+const HOUR_MS = 60 * 60 * 1000;
+const DAY_MS = 24 * HOUR_MS;
 
 type DemoPerson = { id: string; email: string; username: string; displayName: string; bio: string };
 
@@ -35,7 +38,7 @@ export const DEMO_PEOPLE: DemoPerson[] = [
     email: "leo@demo.test",
     username: "demo_leo",
     displayName: "Leo (demo)",
-    bio: "Demo account, not a real person. Movies and series. Slowly getting into anime.",
+    bio: "Demo account, not a real person. Movies, series and sci-fi books. Slowly getting into anime.",
   },
   {
     id: "demo-user-sam",
@@ -65,6 +68,12 @@ export const DEMO_ITEMS = {
   hailMary: item({ type: "book", source: "openlibrary", source_id: "OL21745884W", title: "Project Hail Mary", year: 2021, cover_url: "https://covers.openlibrary.org/b/id/11200092-M.jpg", creators: ["Andy Weir"], total_units: 496, genres: ["Science fiction", "Space flight", "Astronauts", "Interstellar travel", "Fiction, science fiction, action & adventure", "Humorous fiction"] }),
   theMartian: item({ type: "book", source: "openlibrary", source_id: "OL17091839W", title: "The Martian", year: 2011, cover_url: "https://covers.openlibrary.org/b/id/11446816-M.jpg", creators: ["Andy Weir"], total_units: 384, genres: ["Science fiction", "Mars (Planet)", "Space flight", "Astronauts", "Fiction, science fiction, general"] }),
   hollowKnight: item({ type: "game", source: "igdb", source_id: "14593", title: "Hollow Knight", year: 2017, cover_url: "https://images.igdb.com/igdb/image/upload/t_cover_big/co1rgi.jpg", creators: ["Team Cherry"], total_units: null, genres: ["Platform", "Adventure", "Indie", "Action", "Fantasy"] }),
+  // Stage 7: more for Leo, so his profile, diary and stats show what the app can do.
+  arrival: item({ type: "movie", source: "tmdb", source_id: "329865", title: "Arrival", year: 2016, cover_url: "https://image.tmdb.org/t/p/w342/x2FJsf1ElAgr63Y3PNPtJrcmpoe.jpg", creators: [], total_units: null, genres: ["Drama", "Science Fiction", "Mystery"] }),
+  parasite: item({ type: "movie", source: "tmdb", source_id: "496243", title: "Parasite", year: 2019, cover_url: "https://image.tmdb.org/t/p/w342/7IiTTgloJzvGI1TAYymCfbfl3vT.jpg", creators: [], total_units: null, genres: ["Comedy", "Thriller", "Drama"] }),
+  duneMovie: item({ type: "movie", source: "tmdb", source_id: "438631", title: "Dune", year: 2021, cover_url: "https://image.tmdb.org/t/p/w342/d5NXSklXo0qyIYkgV94XAgMIckC.jpg", creators: [], total_units: null, genres: ["Science Fiction", "Adventure"] }),
+  breakingBad: item({ type: "series", source: "tmdb", source_id: "1396", title: "Breaking Bad", year: 2008, cover_url: "https://image.tmdb.org/t/p/w342/ggFHVNu6YYI5L9pCfOacjizRGt.jpg", creators: [], total_units: null, genres: ["Drama", "Crime"] }),
+  duneBook: item({ type: "book", source: "openlibrary", source_id: "OL893415W", title: "Dune", year: 1965, cover_url: "https://covers.openlibrary.org/b/id/11481354-M.jpg", creators: ["Frank Herbert"], total_units: 604, genres: ["Science fiction", "Life on other planets", "Fiction, science fiction, general", "Interplanetary voyages"] }),
   outerWilds: item({ type: "game", source: "igdb", source_id: "11737", title: "Outer Wilds", year: 2019, cover_url: "https://images.igdb.com/igdb/image/upload/t_cover_big/co65ac.jpg", creators: ["Mobius Digital"], total_units: null, genres: ["Puzzle", "Adventure", "Indie", "Science fiction", "Mystery", "Open world"] }),
 } satisfies Record<string, DemoItem>;
 
@@ -81,6 +90,9 @@ type DemoLog = {
   unit?: ProgressUnit;
   rewatch?: boolean;
   hoursAgo: number; // when it was logged, counted back from "now"
+  // Stage 7: "Watched on" date, counted back from today. Some are last year, so
+  // Leo's stats page has a year button and a recap for each year.
+  finishedDaysAgo?: number;
 };
 
 const DEMO_LOGS: DemoLog[] = [
@@ -101,6 +113,16 @@ const DEMO_LOGS: DemoLog[] = [
   { id: "demo-log-11", user: "demo-user-sam", item: "hailMary", status: "completed", rating: 4.5, hoursAgo: 72,
     review: "Like The Martian, but with a friend. Funny science, big heart." },
   { id: "demo-log-12", user: "demo-user-sam", item: "theMartian", status: "planned", hoursAgo: 71 },
+  // Stage 7: Leo is the "mainstream" showcase. Log in as him (leo@demo.test) to see a full profile, a
+  // diary over two years, stats, and bridge picks (he logs mostly movies, series and books).
+  { id: "demo-log-13", user: "demo-user-leo", item: "duneMovie", status: "completed", rating: 4, hoursAgo: 45 * 24, finishedDaysAgo: 45,
+    review: "Huge, slow and loud in the best way. Now reading the book to understand the half I missed." },
+  { id: "demo-log-14", user: "demo-user-leo", item: "duneBook", status: "in_progress", progress: 62, unit: "percent", hoursAgo: 40 * 24 },
+  { id: "demo-log-15", user: "demo-user-leo", item: "arrival", status: "completed", rating: 4.5, hoursAgo: 200 * 24, finishedDaysAgo: 200,
+    review: "A first-contact movie where the weapon is a dictionary. The twist changes how you see every scene before it." },
+  { id: "demo-log-16", user: "demo-user-leo", item: "parasite", status: "completed", rating: 5, hoursAgo: 330 * 24, finishedDaysAgo: 330 },
+  { id: "demo-log-17", user: "demo-user-leo", item: "breakingBad", status: "completed", rating: 5, hoursAgo: 400 * 24, finishedDaysAgo: 400,
+    review: "Five seasons, no bad one. The best slow transformation of a character on TV." },
 ];
 
 // Who follows whom (the demo people follow each other, not you: you choose).
@@ -119,14 +141,27 @@ const DEMO_LIKES: [user: string, log: string][] = [
   ["demo-user-aiko", "demo-log-9"],
 ];
 
-const DEMO_LIST = {
-  id: "demo-list-1",
-  user_id: "demo-user-aiko",
-  title: "Best anime for people who don't watch anime",
-  description: "No 500-episode marathons. Each one works like a great movie or a short series.",
-  is_public: true,
-  items: ["spiritedAway", "cowboyBebop", "frieren", "planetesAnime", "fmab"] as ItemKey[],
-};
+const DEMO_LISTS = [
+  {
+    id: "demo-list-1",
+    user_id: "demo-user-aiko",
+    title: "Best anime for people who don't watch anime",
+    description: "No 500-episode marathons. Each one works like a great movie or a short series.",
+    is_public: true,
+    items: ["spiritedAway", "cowboyBebop", "frieren", "planetesAnime", "fmab"] as ItemKey[],
+    hoursAgo: 48,
+  },
+  {
+    // Stage 7: the app's whole idea in one list, mixing 5 media types.
+    id: "demo-list-2",
+    user_id: "demo-user-leo",
+    title: "Space, in every format",
+    description: "If you liked Interstellar, the same feeling exists as a book, a manga, an anime and a game.",
+    is_public: true,
+    items: ["interstellar", "hailMary", "planetesManga", "cowboyBebop", "outerWilds"] as ItemKey[],
+    hoursAgo: 12,
+  },
+];
 
 /** True when the demo people were already added in this browser. */
 export function hasDemoPeople(storage: KeyValueStorage): boolean {
@@ -146,7 +181,7 @@ function loadAuthDatabase(storage: KeyValueStorage): MockDatabase {
 }
 
 /**
- * Adds the demo people, their logs, likes, follows and list. Safe to call twice:
+ * Adds the demo people, their logs, likes, follows and lists. Safe to call twice:
  * the second time it does nothing and returns false.
  * Your own account, logs and login stay exactly as they were.
  */
@@ -174,7 +209,7 @@ export function seedDemoPeople(storage: KeyValueStorage, now: Date = new Date())
 
   // 2) Items, logs, likes, follows, list (the demo MEDIA data).
   const media = loadMockMediaDatabase(storage);
-  const timeAgo = (hours: number) => new Date(now.getTime() - hours * 60 * 60 * 1000).toISOString();
+  const timeAgo = (hours: number) => new Date(now.getTime() - hours * HOUR_MS).toISOString();
 
   // Reuse an item someone already cached (same source + type + id), or cache it.
   const itemIds = new Map<ItemKey, string>();
@@ -199,7 +234,7 @@ export function seedDemoPeople(storage: KeyValueStorage, now: Date = new Date())
         status: demo.status,
         rating: demo.rating ?? null,
         reviewText: demo.review ?? "",
-        finishedAt: null,
+        finishedAt: demo.finishedDaysAgo === undefined ? null : localToday(new Date(now.getTime() - demo.finishedDaysAgo * DAY_MS)),
         rewatch: demo.rewatch ?? false,
         progress: demo.progress ?? null,
         progressUnit: demo.unit ?? null,
@@ -225,11 +260,12 @@ export function seedDemoPeople(storage: KeyValueStorage, now: Date = new Date())
     media.likes.push({ user_id: user, log_id: log, created_at: now.toISOString() });
   }
 
-  const { items, ...list } = DEMO_LIST;
-  media.lists.push({ ...list, created_at: timeAgo(48) });
-  items.forEach((key, position) => {
-    media.listItems.push({ list_id: list.id, media_item_id: itemIds.get(key)!, position, note: null });
-  });
+  for (const { items, hoursAgo, ...list } of DEMO_LISTS) {
+    media.lists.push({ ...list, created_at: timeAgo(hoursAgo) });
+    items.forEach((key, position) => {
+      media.listItems.push({ list_id: list.id, media_item_id: itemIds.get(key)!, position, note: null });
+    });
+  }
 
   // Save both at the end, so a problem above leaves nothing half-added.
   storage.setItem(MOCK_STORAGE_KEY, JSON.stringify(auth));

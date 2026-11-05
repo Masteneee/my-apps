@@ -217,7 +217,7 @@ export function StatsView({ username }: { username: string }) {
                     {recap.topRated.map((log) => (
                       <li key={log.id}>
                         <Link href={mediaItemPath(log.media)} className="block">
-                          <Poster src={log.media.cover_url} title={log.media.title} />
+                          <Poster src={log.media.cover_url} title={log.media.title} sizes="(min-width: 640px) 200px, 33vw" />
                           <span className="mt-1 block truncate text-xs text-zinc-300">{log.media.title}</span>
                           <span className="text-xs text-amber-300">{ratingToStars(log.rating)}</span>
                         </Link>

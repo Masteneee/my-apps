@@ -61,7 +61,7 @@ function PickCard({ rec, onLog }: { rec: Recommendation; onLog: (media: MediaRes
   const href = mediaItemId
     ? mediaItemPath({ type: media.type, source: media.source, source_id: media.sourceId })
     : null;
-  const poster = <Poster src={media.coverUrl} title={media.title} />;
+  const poster = <Poster src={media.coverUrl} title={media.title} sizes="64px" />;
   return (
     <li className="flex gap-3 rounded-lg border border-zinc-800 bg-zinc-900 p-3 text-left">
       <div className="w-16 shrink-0">{href ? <Link href={href}>{poster}</Link> : poster}</div>

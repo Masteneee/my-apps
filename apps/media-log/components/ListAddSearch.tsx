@@ -85,7 +85,7 @@ export function ListAddSearch({ list, onAdded }: Props) {
             return (
               <li key={`${result.source}-${result.type}-${result.sourceId}`} className="flex items-center gap-3 py-2">
                 <div className="w-8 shrink-0">
-                  <Poster src={result.coverUrl} title={result.title} />
+                  <Poster src={result.coverUrl} title={result.title} sizes="32px" />
                 </div>
                 <p className="min-w-0 flex-1 truncate text-sm">
                   {result.title} <span className="text-zinc-500">{result.year}</span>

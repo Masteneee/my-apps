@@ -257,7 +257,7 @@ function SearchResults({ search, canLog, signedIn, onPick }: ResultsProps) {
             className="flex gap-4 rounded-lg border border-zinc-800 bg-zinc-900 p-3"
           >
             <div className="w-16 shrink-0 sm:w-20">
-              <Poster src={item.coverUrl} title={item.title} />
+              <Poster src={item.coverUrl} title={item.title} sizes="80px" />
             </div>
             {/* min-w-0 lets long titles wrap instead of pushing the layout wider than the phone. */}
             <div className="flex min-w-0 flex-1 flex-col">

@@ -1041,3 +1041,155 @@ Answers
 2. Interstellar: 1 point × (4 − 3) = 1. The Hobbit: 1 point × (5 − 3) = 2. The best one wins: score 2, "Because you
    rated The Hobbit 5★: shares Fantasy". (favoritesMatched is 2, used only to break ties.)
 3. 6 of 8 = 75%: yes, exactly on the line. 6 of 9 = 67%: no, they already log niche media, so only "More for you".
+
+## Stage 7: Ship + portfolio (2026-11-05)
+
+### What we built
+- **Ready to deploy on Vercel.** No `vercel.json` needed (Vercel detects Next.js); the README has the exact steps
+  (Root Directory `apps/media-log`), the table of environment variables, and the Supabase URL settings to change after.
+  Not deployed yet: no Vercel account or internet here.
+- **A demo account with real logs.** `supabase/seed/demo-account.sql` fills one account (username `demo`) with 15 logs
+  of well-known titles, reviews, progress, dates over two years and a cross-media list. In demo mode, the demo person
+  **Leo** got the same treatment (5 more logs, a second list), so logging in as `leo@demo.test` shows bridge picks,
+  a two-year stats page and a full diary.
+- **A portfolio README:** the gap statement, a feature list, 4 screenshots (`docs/screenshots/`) and a Mermaid
+  architecture diagram. **`ARCHITECTURE.md`** explains every folder and follows one search end to end.
+- **Performance pass:** covers through `next/image` (resized, WebP/AVIF, cached 30 days), every call to a source
+  cached 1 hour by Next.js, and `/api/search` answers cached by the browser (1 minute) and Vercel's CDN (1 hour).
+
+### The plan we followed
+1. Read README, PLAN, the search route and the Poster component to see what was already there.
+2. Images: one list of allowed cover hosts (`lib/media/covers.ts`, tested), `images.remotePatterns` in `next.config.ts`,
+   `Poster` switched to `<Image fill sizes=...>`, each use given its real width.
+3. Caching: two pure helpers in `lib/sources/cache.ts` (tested), plugged into `server.ts` and the route.
+4. Seeds: more demo logs for Leo (tested: bridge picks, two years, every media type covered), and the SQL seed with a
+   test that reads it and checks it against the samples and the log rules.
+5. Lint, tests, build. Production server in demo mode, screenshots with Playwright, then docs.
+
+### New concepts
+
+**Image optimization (`next/image`).** A plain `<img>` downloads whatever file the address points to, at full size.
+`<Image>` instead points the browser to our own server (`/_next/image?url=...&w=256&q=75`), which downloads the original
+once, shrinks it to the width the page needs, converts it to WebP or AVIF and caches the result. The `sizes` prop tells
+the browser how wide the image will be on screen (`"64px"`, or `"33vw"` = a third of the screen) so it picks the right
+file from the list (`srcset`).
+
+**Allowlists (`remotePatterns`).** If our server resized any picture from anywhere, anyone could use it as a free image
+service, or make it fetch strange addresses. So Next.js only accepts the hosts we list. Any `https` address can end up in
+`media_items.cover_url` (any logged-in user can cache an item), so `Poster` checks the host first and shows other covers
+as a plain image (`unoptimized`) instead of a broken one.
+
+**Caching, at three levels.** A cache keeps an answer so the next identical question doesn't redo the work. Here:
+(1) the Next.js **Data Cache** keeps each source's answer for an hour (`fetch(url, { next: { revalidate: 3600 } })`),
+keyed by URL, method, headers and body, and only for "200 OK" answers; (2) Vercel's **CDN** (servers close to the
+visitor) keeps our `/api/search` answer for an hour; (3) the **browser** keeps it for a minute. The hard part of caching
+is deciding what NOT to keep: an incomplete answer (a source failed) gets `no-store`.
+
+**`Cache-Control` header.** The instructions a server attaches to an answer. `max-age=60` is for the browser,
+`s-maxage=3600` is for shared caches like a CDN, `stale-while-revalidate=86400` lets the CDN answer with an old copy for a
+day while it fetches a fresh one in the background, `public` means it's the same for everyone (our route never reads
+cookies), and `no-store` means "keep it nowhere".
+
+**Seed data.** Data you put in a database on purpose, so an app isn't empty (for demos, tests or first deploys). Our seed
+is SQL run by hand in the SQL Editor, which runs as the database owner, so Row Level Security doesn't block it. It's
+written to be safe to re-run (it stops if the account already has logs) and only touches one named account.
+
+**Mermaid diagrams.** A diagram written as text (`flowchart LR`, `A --> B`) inside a ```` ```mermaid ```` block. GitHub
+draws it as a picture in the README, and since it's text, it changes in the same commit as the code it describes.
+
+**Environment variables on a host.** `.env.local` stays on your computer (it's in `.gitignore`), so Vercel needs the same
+variables in its project settings. `NEXT_PUBLIC_` ones are glued into the browser code when the app is **built**, so
+changing them needs a redeploy; the others are read by the server on each request.
+
+### New dependencies
+None. `next/image` is part of Next.js. The screenshots used the Playwright already installed on the machine, from a
+throwaway script outside the app (it isn't in `package.json`).
+
+### Files and what each one does
+- `lib/media/covers.ts` (new) the 4 cover hosts (`COVER_HOSTS`) and `isOptimizableCover(url)`. Tests:
+  `covers.test.ts` (real covers yes; other hosts, look-alike hosts, http, custom ports, junk no).
+- `next.config.ts` `images.remotePatterns` built from `COVER_HOSTS`, `minimumCacheTTL` 30 days.
+- `components/Poster.tsx` `<Image fill sizes unoptimized? loading>` in a `relative` 2:3 box, same title fallback.
+  New props `sizes` and `eager` (the big cover on item pages loads first).
+- `components/*.tsx` (10 files) each `<Poster>` now says how wide it shows (`sizes="48px"`...).
+- `lib/sources/cache.ts` (new) `SOURCE_REVALIDATE_SECONDS`, `withRevalidate(fetch)`, `searchCacheControl(answer)`.
+  Tests: `cache.test.ts`.
+- `lib/sources/server.ts` passes `withRevalidate(fetch)` to the sources (not to the Twitch token request).
+- `app/api/search/route.ts` adds the `Cache-Control` header.
+- `lib/demo/seed.ts` 5 more items and 5 more logs for Leo (with `finishedDaysAgo` dates), a second list. Tests:
+  `seed.test.ts` (2 new tests).
+- `supabase/seed/demo-account.sql` (new) the demo account seed (17 items, 15 logs, 1 list).
+- `lib/demo/sql-seed.test.ts` (new) reads that SQL file and checks it (see "Most important lines").
+- `README.md` gap, features, screenshots, diagram, deploy and seed steps, Stage 7 test steps.
+- `ARCHITECTURE.md` (new) every folder, the search request end to end, where data lives.
+- `docs/screenshots/*.png` (new) 4 screenshots, 150 to 310 KB each.
+
+### Most important lines
+```ts
+return (input, init) => fetchFn(input, { ...init, next: { ...init?.next, revalidate: seconds } });
+```
+`withRevalidate` in `lib/sources/cache.ts`: one wrapper, and every adapter's request is cached, without changing any
+adapter. That works because since Stage 3 adapters receive `fetchFn` as a parameter instead of calling `fetch` directly.
+
+```ts
+const incomplete = answer.sources.some((s) => s.state === "error" || s.sampleReason === "live-failed");
+return incomplete ? UNCACHEABLE_SEARCH : CACHEABLE_SEARCH;
+```
+Without this, one search while AniList is down would tell everyone "couldn't reach AniList" for an hour.
+
+```tsx
+unoptimized={!isOptimizableCover(src)}
+```
+In `Poster`: covers from our 4 sources are optimized, anything else is shown as-is instead of failing.
+
+```ts
+expect(item, item.title).toEqual(mediaItemFields(sample!));
+```
+In `sql-seed.test.ts`: a test that reads a SQL file. We can't run Postgres here, but we can check that every item the
+seed caches is exactly what search returns (otherwise logging Interstellar later would create a second copy) and that
+every log passes `validateLogInput`, the same rules as the form.
+
+### Decisions
+- **`next/image` instead of a plain `<img>`:** covers are most of the bytes on profile and search pages. The cost is
+  Vercel's free plan limit on image optimizations per month; covers are cached 30 days, so each one is resized only
+  once per width. If the limit is ever reached, `images: { unoptimized: true }` in `next.config.ts` turns it all off.
+- **Exact hosts, not wildcards.** `covers.openlibrary.org` redirects to `archive.org` servers; Next.js follows up to 3
+  redirects without re-checking the list, so we don't need to allow `*.archive.org`.
+- **1 hour for sources.** Search results barely change; an hour saves most repeated calls while a new release still
+  appears the same day. The IGDB **token** request is never cached (it carries the secret, and the token is already kept
+  in memory).
+- **Browser cache only 1 minute.** Long enough for "back" and retyping to be instant, short enough that adding a key and
+  restarting shows the change quickly. The CDN copy is cleared on each new deployment anyway.
+- **Demo account seed as plain SQL, not a script.** You can read it top to bottom and paste it in the SQL Editor; a script
+  would need the `service_role` key (a secret) or a login. The account itself is created by signing up, so the seed has
+  no passwords.
+- **Why one row per line in the SQL:** so the test can read it with simple patterns. The test also counts the rows, so a
+  row in a new format can't be skipped silently.
+- **Screenshots from demo mode, offline,** so covers show their titles. I picked screens that are about text (bridge
+  picks with reasons, search, stats bars, the feed) rather than poster grids. Retake them once deployed with real covers
+  if you want.
+- **Not deployed, and the seed was never run on a real Supabase project** (no account or internet here). The source ids
+  in both seeds were written from memory.
+
+### Practice exercise
+Make the browser cache time a named setting. In `lib/sources/cache.ts`, add
+`export const SEARCH_BROWSER_SECONDS = 60` and build `CACHEABLE_SEARCH` from it and `SOURCE_REVALIDATE_SECONDS` with a
+template string, then add a test that changing `SEARCH_BROWSER_SECONDS` would change the header (check
+`CACHEABLE_SEARCH` contains `` `max-age=${SEARCH_BROWSER_SECONDS}` ``). Then run `npm run build && npm start` and use
+`curl -I` (README step 39) to see the header. Bonus: why must the header of an answer with `state: "error"` be `no-store`
+and not just a shorter `max-age`?
+
+### Quiz
+1. `isOptimizableCover("https://image.tmdb.org.evil.com/x.jpg")` returns false. Why would checking
+   `url.includes("image.tmdb.org")` be a mistake?
+2. Two people search `dune` with "All" 10 minutes apart on the deployed site. How many calls reach TMDB?
+3. You add `TMDB_READ_ACCESS_TOKEN` on Vercel but search still uses samples. What did you forget?
+
+Answers
+1. `includes` matches the text anywhere, so `image.tmdb.org.evil.com` (a host the attacker owns) would pass. Parsing
+   with `new URL()` and comparing the exact `hostname` doesn't have that hole.
+2. Usually zero for the second person: Vercel's CDN answers `/api/search?q=dune&type=all` from its copy (s-maxage 1 hour).
+   Even if it didn't (another CDN location), the server's Data Cache already holds TMDB's answer. Only the first search
+   made 2 TMDB calls (movies and series).
+3. To redeploy. Variables are read when the app is deployed and started; a new value only applies to the next
+   deployment (Deployments > ⋯ > Redeploy).
