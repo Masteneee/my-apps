@@ -22,7 +22,7 @@ Done: shorts-blocker (3/3), wondered-site (4/4), media-log Stages 1 to 5 (runs i
 - [x] Stage 3: Unified search
 - [x] Stage 4: Tracking + diary
 - [x] Stage 5: Social
-- [ ] Stage 6: Stats + bridge recommendations
+- [x] Stage 6: Stats + bridge recommendations
 - [ ] Stage 7: Ship + portfolio
 
 ## 4. wellbeing-app

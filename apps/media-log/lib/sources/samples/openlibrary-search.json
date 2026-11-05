@@ -12,7 +12,16 @@
       "first_publish_year": 1965,
       "cover_i": 11481354,
       "number_of_pages_median": 604,
-      "edition_count": 154
+      "edition_count": 154,
+      "subject": [
+        "Science fiction",
+        "Dune (Imaginary place)",
+        "Fiction",
+        "Life on other planets",
+        "Fiction, science fiction, general",
+        "Interplanetary voyages",
+        "Large type books"
+      ]
     },
     {
       "key": "/works/OL27964541W",
@@ -20,7 +29,10 @@
       "author_name": [
         "Frank Herbert"
       ],
-      "edition_count": 1
+      "edition_count": 1,
+      "subject": [
+        "Science fiction"
+      ]
     },
     {
       "key": "/works/OL893512W",
@@ -31,7 +43,12 @@
       "first_publish_year": 1969,
       "cover_i": 8231994,
       "number_of_pages_median": 331,
-      "edition_count": 90
+      "edition_count": 90,
+      "subject": [
+        "Science fiction",
+        "Dune (Imaginary place)",
+        "Fiction"
+      ]
     },
     {
       "key": "/works/OL262758W",
@@ -43,7 +60,15 @@
       "first_publish_year": 1937,
       "cover_i": 14627509,
       "number_of_pages_median": 310,
-      "edition_count": 320
+      "edition_count": 320,
+      "subject": [
+        "Fantasy fiction",
+        "Juvenile fiction",
+        "Dragons",
+        "Fiction",
+        "Adventure stories",
+        "Middle Earth (Imaginary place)"
+      ]
     },
     {
       "key": "/works/OL82563W",
@@ -54,7 +79,15 @@
       "first_publish_year": 1997,
       "cover_i": 10521270,
       "number_of_pages_median": 309,
-      "edition_count": 250
+      "edition_count": 250,
+      "subject": [
+        "Fantasy fiction",
+        "Magic",
+        "Juvenile fiction",
+        "Schools",
+        "Wizards",
+        "Witches"
+      ]
     },
     {
       "key": "/works/OL1168083W",
@@ -65,7 +98,15 @@
       "first_publish_year": 1949,
       "cover_i": 9267242,
       "number_of_pages_median": 328,
-      "edition_count": 400
+      "edition_count": 400,
+      "subject": [
+        "Dystopias",
+        "Totalitarianism",
+        "Fiction",
+        "Political fiction",
+        "Science fiction",
+        "Psychological fiction"
+      ]
     },
     {
       "key": "/works/OL66554W",
@@ -76,7 +117,15 @@
       "first_publish_year": 1813,
       "cover_i": 14348537,
       "number_of_pages_median": 384,
-      "edition_count": 2900
+      "edition_count": 2900,
+      "subject": [
+        "Love stories",
+        "Fiction",
+        "Courtship",
+        "Domestic fiction",
+        "Social classes",
+        "Historical fiction"
+      ]
     },
     {
       "key": "/works/OL17091839W",
@@ -87,7 +136,15 @@
       "first_publish_year": 2011,
       "cover_i": 11446816,
       "number_of_pages_median": 384,
-      "edition_count": 50
+      "edition_count": 50,
+      "subject": [
+        "Science fiction",
+        "Mars (Planet)",
+        "Space flight",
+        "Astronauts",
+        "Survival",
+        "Fiction, science fiction, general"
+      ]
     },
     {
       "key": "/works/OL21745884W",
@@ -98,7 +155,15 @@
       "first_publish_year": 2021,
       "cover_i": 11200092,
       "number_of_pages_median": 496,
-      "edition_count": 30
+      "edition_count": 30,
+      "subject": [
+        "Science fiction",
+        "Space flight",
+        "Astronauts",
+        "Interstellar travel",
+        "Fiction, science fiction, action & adventure",
+        "Humorous fiction"
+      ]
     },
     {
       "key": "/works/OL15835405W",
@@ -110,7 +175,13 @@
       "first_publish_year": 1993,
       "cover_i": 8233371,
       "number_of_pages_median": 360,
-      "edition_count": 40
+      "edition_count": 40,
+      "subject": [
+        "Fantasy fiction",
+        "Monsters",
+        "Magic",
+        "Fiction, fantasy, epic"
+      ]
     },
     {
       "key": "/works/OL274505W",
@@ -121,7 +192,13 @@
       "first_publish_year": 1967,
       "cover_i": 12872048,
       "number_of_pages_median": 417,
-      "edition_count": 200
+      "edition_count": 200,
+      "subject": [
+        "Magic realism (Literature)",
+        "Families",
+        "Fiction",
+        "Colombia"
+      ]
     },
     {
       "key": "/works/OL1102616W",
@@ -132,7 +209,14 @@
       "first_publish_year": 1605,
       "cover_i": 12621906,
       "number_of_pages_median": 1056,
-      "edition_count": 1500
+      "edition_count": 1500,
+      "subject": [
+        "Knights and knighthood",
+        "Fiction",
+        "Satire",
+        "Spain",
+        "Adventure stories"
+      ]
     }
   ],
   "num_found": 12,

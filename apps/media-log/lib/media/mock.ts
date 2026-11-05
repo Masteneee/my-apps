@@ -9,18 +9,19 @@ import type { KeyValueStorage } from "../auth/mock";
 import { attachSocial, buildFeed, hasReview, likeProblem, newestFirst } from "./feed";
 import { validateListInput } from "./lists";
 import { nextPosition, positionChanges, sortByPosition } from "./reorder";
-import type {
-  ListItem,
-  ListWithItems,
-  Log,
-  LogWithMedia,
-  MediaItem,
-  MediaList,
-  MediaResult,
-  MediaStore,
-  NewLogInput,
-  PublicProfile,
-  ReviewLike,
+import {
+  MEDIA_POOL_LIMIT,
+  type ListItem,
+  type ListWithItems,
+  type Log,
+  type LogWithMedia,
+  type MediaItem,
+  type MediaList,
+  type MediaResult,
+  type MediaStore,
+  type NewLogInput,
+  type PublicProfile,
+  type ReviewLike,
 } from "./types";
 import { localToday, mediaItemFields, planLogUpdate, validateLogInput } from "./validation";
 
@@ -59,8 +60,11 @@ export function loadMockMediaDatabase(storage: KeyValueStorage): MockMediaDataba
     // Logs saved before Stage 4 have no `progress_unit`: give them null, like
     // the database does for old rows when the new column is added.
     const logs = (parsed.logs ?? []).map((log) => ({ ...log, progress_unit: log.progress_unit ?? null }));
+    // Items cached before Stage 6 have no `genres`: give them [] ("unknown"),
+    // like the database's default '{}' for old rows when the column is added.
+    const mediaItems = (parsed.mediaItems ?? []).map((item) => ({ ...item, genres: item.genres ?? [] }));
     return {
-      mediaItems: parsed.mediaItems ?? [],
+      mediaItems,
       logs,
       follows: parsed.follows ?? [],
       likes: parsed.likes ?? [],
@@ -403,6 +407,16 @@ export function createMockMediaStore({
       }
       save(db);
       return reloadList(listId, me);
+    },
+
+    // ----- Stage 6: recommendations -----
+
+    async listMediaItems() {
+      // Newest first: items are pushed at the end, so reverse, then sort by date (stable).
+      return [...load().mediaItems]
+        .reverse()
+        .sort((a, b) => b.cached_at.localeCompare(a.cached_at))
+        .slice(0, MEDIA_POOL_LIMIT);
     },
   };
 }

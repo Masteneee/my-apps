@@ -4,7 +4,7 @@ One place to log, rate and review everything you watch, read and play: movies, s
 books and games. Think Letterboxd, but for every kind of media, with one profile. See `PLAN.md` for
 the full plan and `LEARNING.md` for what each stage taught.
 
-**Status:** Stage 5 (social) done. One search bar finds movies and series (TMDB), anime and manga
+**Status:** Stage 6 (stats + bridge recommendations) done. One search bar finds movies and series (TMDB), anime and manga
 (AniList), books (Open Library) and games (IGDB), merged into one list without duplicates. You can log any
 of them with a status, rating, review and **progress** (episode 7/24, chapter 120/?, 45% of a book, 12.5
 hours in a game), see them grouped by type on your profile at `/u/username`, read your **diary** (every log,
@@ -15,6 +15,11 @@ grouped by month) at `/u/username/diary`, and open any logged item's page at `/m
 reviewed), **like** reviews, and make public or private **lists** at `/u/username/lists` that you reorder by
 dragging (or with ↑ ↓ buttons on phones and keyboards). In demo mode, the feed page can add 3 clearly labeled
 **demo people** so there's someone to follow.
+
+**Stats + recommendations (Stage 6):** every profile has a **stats** page at `/u/username/stats` (count per media
+type, rating distribution, top genres, a yearly recap). Signed in, the home page shows **Bridge picks** (anime, manga
+and games for people who mostly log movies, series and books) and **More for you** (other media types). Every pick
+says why: "Because you rated Interstellar 5★: shares Sci-Fi, Adventure, Drama". Item pages show the item's tags.
 
 ## Run it
 
@@ -49,9 +54,10 @@ touches this folder.
    same with `supabase/migrations/20261105010000_media_logs_lists_follows.sql` (order matters: the second
    file points to the `profiles` table), then `supabase/migrations/20261105020000_progress_units.sql`
    (Stage 4: adds `logs.progress_unit` and lets `progress` hold 12.5 hours), then
-   `supabase/migrations/20261105030000_review_likes.sql` (Stage 5: likes on reviews). Table Editor should now
-   show 7 tables, each marked "RLS enabled", `logs` should have a `progress_unit` column, and there should be
-   a `review_likes` table.
+   `supabase/migrations/20261105030000_review_likes.sql` (Stage 5: likes on reviews), then
+   `supabase/migrations/20261105040000_media_genres.sql` (Stage 6: genres on media items). Table Editor should now
+   show 7 tables, each marked "RLS enabled", `logs` should have a `progress_unit` column, `media_items` a `genres`
+   column, and there should be a `review_likes` table.
 3. Project Settings > API: copy the Project URL and the anon (or "publishable") key.
 4. `cp .env.example .env.local` and paste them in. Never use the `service_role` / secret key here.
 5. Authentication > URL Configuration: Site URL `http://localhost:3000`, and add
@@ -176,6 +182,21 @@ offline).
     `leo@demo.test` / `demo-password`. The private URL says "List not found", and `/u/<you>/lists` only shows the
     public one. As Leo you can like YOUR review on Interstellar.
 
+30. **Stats (Stage 6).** Start fresh (see "reset" below), sign up, open the home page: under **Bridge picks**, "Log at
+    least 3 things (you have 0)". Log `interstellar` (5 stars), `arrival` (4.5) and the book `the hobbit` (4).
+31. Open the home page again. **Bridge picks** shows 3 cards, one anime, one game and one manga: Cowboy Bebop
+    ("Because you rated Interstellar 5★: shares Sci-Fi, Adventure, Drama"), Outer Wilds and the Planetes manga.
+    **More for you** shows 6 picks of mixed types (a series, a book, the Planetes anime...).
+32. Press **Log it** on Cowboy Bebop, rate it 4, save: "Logged Cowboy Bebop." and it leaves the picks.
+33. On your profile, click **Stats** (or open `/u/<you>/stats`): Movies 2, Anime 1, Books 1; the rating bars with
+    "4 rated · average 4.4★"; **Top genres** led by Sci-Fi; a **2026 recap** with entries, finished, average, the
+    top genre, the busiest month and the 3 best-rated posters. Log something with a "Watched on" date last year: a
+    year button appears above the recap.
+34. Open `/media/movie/tmdb-157336` (Interstellar): tag chips "Sci-Fi · Adventure · Drama" under the title.
+35. Log `frieren` (anime) as well: now 2 of 5 items are anime, so the home page says "You already log plenty of anime,
+    manga or games" instead of bridge picks (More for you stays). Log out: the home page shows no picks at all.
+36. At phone width, the stats cards stack in one column and the picks in one column, nothing overflows.
+
 To reset demo data: DevTools > Application > Local Storage > delete `media-log:mock-db` (accounts, including
 the demo people) and `media-log:mock-media` (logs, follows, likes, lists).
 
@@ -189,6 +210,7 @@ app/u/[username]/diary/ the diary page
 app/u/[username]/lists/ someone's lists (Stage 5)
 app/lists/[id]/      one list, with drag-to-reorder for its owner
 app/feed/            the home feed
+app/u/[username]/stats/ the stats page (Stage 6)
 components/          React components (forms, nav bar, profile, diary, item page, progress tracker, search,
                      poster grid, AuthProvider, useProfileLogs hook; Stage 5: feed, follow and like
                      buttons, review cards, lists, list editor, add to list)
@@ -197,9 +219,12 @@ lib/media/           the MediaStore interface (logs, follows, likes, lists) + mo
                      validation, progress math (progress.ts), diary grouping (diary.ts), item page links
                      (links.ts), feed building + like rules (feed.ts), list order math (reorder.ts), list
                      checks (lists.ts) (+ tests)
+                     Stage 6: shared genre tags (tags.ts), stats (stats.ts), recommendations and bridge
+                     picks (recommend.ts) (+ tests)
 lib/demo/            demo mode only: the 3 labeled demo people (seed.ts) (+ tests)
 lib/sources/         one adapter per search source (tmdb, anilist, openlibrary, igdb), merging + dedup,
-                     the unified search, env setup, saved sample answers in samples/ (+ tests)
+                     the unified search, env setup, saved sample answers in samples/, the samples as a
+                     catalog for recommendations (catalog.ts) (+ tests)
 lib/supabase/        the one shared Supabase client
 supabase/migrations/ SQL to paste into Supabase, in filename order
 ```
@@ -229,3 +254,13 @@ Social (Stage 5): the feed page calls `getFeed()`. With Supabase, that's "who do
 likes of those logs" (`review_likes`, one request). The pure functions in `lib/media/feed.ts` count the likes and
 glue it together; the demo store runs the same functions on its localStorage data. A list's order is the
 `position` column of `list_items`; `lib/media/reorder.ts` works out the new order and which rows to save.
+
+Stats + recommendations (Stage 6): each source's own genre words ("Science Fiction", "Sci-Fi", "Fiction, science
+fiction, general") are saved in `media_items.genres` and translated into ONE small shared tag set by
+`lib/media/tags.ts`, so a movie and a manga can be compared. The stats page runs the pure functions in
+`lib/media/stats.ts` on the profile's logs. The home page loads your logs and `listMediaItems()` (cached items, at most
+500), adds the saved samples (`lib/sources/catalog.ts`), and `lib/media/recommend.ts` scores every item you haven't
+logged against everything you rated 4★+ in another media type: shared tag points (broad tags like Drama count half)
+× (rating − 3). **Bridge rule:** you get bridge picks when you logged at least 3 different things and at least 75%
+of them are movies, series or books; they are then the best anime, manga and game picks from those favorites, one
+of each type first. No AI model, no outside requests.

@@ -139,6 +139,9 @@ export function ProfileView({ username }: { username: string }) {
             <Link href={`/u/${profile.username}/lists`} className="text-violet-400 hover:underline">
               Lists
             </Link>
+            <Link href={`/u/${profile.username}/stats`} className="text-violet-400 hover:underline">
+              Stats
+            </Link>
             {isMe && (
               <Link href="/search" className="text-violet-400 hover:underline">
                 Log something else

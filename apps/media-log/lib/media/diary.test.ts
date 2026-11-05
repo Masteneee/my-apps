@@ -28,6 +28,7 @@ function log(id: string, createdAt: string, finishedAt: string | null = null): L
       cover_url: null,
       creators: [],
       total_units: null,
+      genres: [],
       cached_at: createdAt,
     },
   };

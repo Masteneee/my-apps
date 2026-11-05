@@ -40,6 +40,7 @@ function log(id: string, mediaId: string, type: MediaType = "movie"): LogWithMed
       cover_url: null,
       creators: [],
       total_units: null,
+      genres: [],
       cached_at: "2026-11-05T12:00:00.000Z",
     },
   };

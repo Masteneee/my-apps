@@ -32,6 +32,7 @@ describe("igdbGameToMediaResult", () => {
       creators: ["CD Projekt RED"], // the developer, not the publisher
       totalUnits: null,
       overview: witcher3.summary,
+      genres: ["Role-playing (RPG)", "Adventure", "Action", "Fantasy", "Open world"], // genres, then themes
     });
   });
 
@@ -42,6 +43,20 @@ describe("igdbGameToMediaResult", () => {
       involved_companies: [{ id: 1, developer: false, company: { id: 9, name: "Some Publisher" } }],
     });
     expect(result).toMatchObject({ year: null, coverUrl: null, overview: null, creators: ["Some Publisher"] });
+  });
+
+  it("keeps genres and themes, without repeats (Stage 6)", () => {
+    const result = igdbGameToMediaResult({
+      id: 6,
+      name: "Space Game",
+      genres: [{ id: 5, name: "Shooter" }],
+      themes: [
+        { id: 18, name: "Science fiction" },
+        { id: 99, name: "shooter" }, // same word, other case
+      ],
+    });
+    expect(result.genres).toEqual(["Shooter", "Science fiction"]);
+    expect(igdbGameToMediaResult({ id: 7, name: "Bare" }).genres).toEqual([]);
   });
 
   it("reads Unix timestamps in seconds", () => {
@@ -80,7 +95,7 @@ describe("buildIgdbQuery", () => {
     expect(buildIgdbQuery("zelda", 8)).toBe(
       [
         'search "zelda";',
-        "fields name,first_release_date,summary,cover.image_id,involved_companies.developer,involved_companies.company.name;",
+        "fields name,first_release_date,summary,cover.image_id,involved_companies.developer,involved_companies.company.name,genres.name,themes.name;",
         "where version_parent = null & themes != (42);",
         "limit 8;",
       ].join("\n"),

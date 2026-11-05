@@ -54,7 +54,40 @@
                 }
               }
             ]
-          }
+          },
+          "genres": [
+            "Action",
+            "Drama",
+            "Fantasy",
+            "Mystery"
+          ],
+          "tags": [
+            {
+              "name": "Military",
+              "rank": 88,
+              "isMediaSpoiler": false
+            },
+            {
+              "name": "Post-Apocalyptic",
+              "rank": 82,
+              "isMediaSpoiler": false
+            },
+            {
+              "name": "Survival",
+              "rank": 86,
+              "isMediaSpoiler": false
+            },
+            {
+              "name": "War",
+              "rank": 85,
+              "isMediaSpoiler": true
+            },
+            {
+              "name": "Male Protagonist",
+              "rank": 80,
+              "isMediaSpoiler": false
+            }
+          ]
         },
         {
           "id": 199,
@@ -99,7 +132,29 @@
                 }
               }
             ]
-          }
+          },
+          "genres": [
+            "Adventure",
+            "Drama",
+            "Supernatural"
+          ],
+          "tags": [
+            {
+              "name": "Gods",
+              "rank": 78,
+              "isMediaSpoiler": false
+            },
+            {
+              "name": "Female Protagonist",
+              "rank": 96,
+              "isMediaSpoiler": false
+            },
+            {
+              "name": "Coming of Age",
+              "rank": 72,
+              "isMediaSpoiler": false
+            }
+          ]
         },
         {
           "id": 21519,
@@ -144,7 +199,24 @@
                 }
               }
             ]
-          }
+          },
+          "genres": [
+            "Drama",
+            "Romance",
+            "Supernatural"
+          ],
+          "tags": [
+            {
+              "name": "Body Swapping",
+              "rank": 95,
+              "isMediaSpoiler": false
+            },
+            {
+              "name": "Time Skip",
+              "rank": 70,
+              "isMediaSpoiler": false
+            }
+          ]
         },
         {
           "id": 1535,
@@ -187,7 +259,30 @@
                 }
               }
             ]
-          }
+          },
+          "genres": [
+            "Mystery",
+            "Psychological",
+            "Supernatural",
+            "Thriller"
+          ],
+          "tags": [
+            {
+              "name": "Detective",
+              "rank": 87,
+              "isMediaSpoiler": false
+            },
+            {
+              "name": "Crime",
+              "rank": 84,
+              "isMediaSpoiler": false
+            },
+            {
+              "name": "Anti-Hero",
+              "rank": 93,
+              "isMediaSpoiler": false
+            }
+          ]
         },
         {
           "id": 21,
@@ -232,7 +327,26 @@
                 }
               }
             ]
-          }
+          },
+          "genres": [
+            "Action",
+            "Adventure",
+            "Comedy",
+            "Drama",
+            "Fantasy"
+          ],
+          "tags": [
+            {
+              "name": "Pirates",
+              "rank": 95,
+              "isMediaSpoiler": false
+            },
+            {
+              "name": "Super Power",
+              "rank": 86,
+              "isMediaSpoiler": false
+            }
+          ]
         },
         {
           "id": 329,
@@ -277,7 +391,29 @@
                 }
               }
             ]
-          }
+          },
+          "genres": [
+            "Drama",
+            "Romance",
+            "Sci-Fi"
+          ],
+          "tags": [
+            {
+              "name": "Space",
+              "rank": 97,
+              "isMediaSpoiler": false
+            },
+            {
+              "name": "Astronauts",
+              "rank": 88,
+              "isMediaSpoiler": false
+            },
+            {
+              "name": "Workplace",
+              "rank": 84,
+              "isMediaSpoiler": false
+            }
+          ]
         },
         {
           "id": 154587,
@@ -322,7 +458,29 @@
                 }
               }
             ]
-          }
+          },
+          "genres": [
+            "Adventure",
+            "Drama",
+            "Fantasy"
+          ],
+          "tags": [
+            {
+              "name": "Iyashikei",
+              "rank": 79,
+              "isMediaSpoiler": false
+            },
+            {
+              "name": "Elf",
+              "rank": 95,
+              "isMediaSpoiler": false
+            },
+            {
+              "name": "Time Skip",
+              "rank": 86,
+              "isMediaSpoiler": false
+            }
+          ]
         },
         {
           "id": 1,
@@ -365,7 +523,30 @@
                 }
               }
             ]
-          }
+          },
+          "genres": [
+            "Action",
+            "Adventure",
+            "Drama",
+            "Sci-Fi"
+          ],
+          "tags": [
+            {
+              "name": "Space",
+              "rank": 94,
+              "isMediaSpoiler": false
+            },
+            {
+              "name": "Noir",
+              "rank": 81,
+              "isMediaSpoiler": false
+            },
+            {
+              "name": "Music",
+              "rank": 50,
+              "isMediaSpoiler": false
+            }
+          ]
         },
         {
           "id": 5114,
@@ -410,7 +591,30 @@
                 }
               }
             ]
-          }
+          },
+          "genres": [
+            "Action",
+            "Adventure",
+            "Drama",
+            "Fantasy"
+          ],
+          "tags": [
+            {
+              "name": "Military",
+              "rank": 85,
+              "isMediaSpoiler": false
+            },
+            {
+              "name": "Alchemy",
+              "rank": 97,
+              "isMediaSpoiler": false
+            },
+            {
+              "name": "Tragedy",
+              "rank": 65,
+              "isMediaSpoiler": true
+            }
+          ]
         }
       ]
     },
@@ -463,7 +667,30 @@
                 }
               }
             ]
-          }
+          },
+          "genres": [
+            "Action",
+            "Drama",
+            "Fantasy",
+            "Mystery"
+          ],
+          "tags": [
+            {
+              "name": "Military",
+              "rank": 87,
+              "isMediaSpoiler": false
+            },
+            {
+              "name": "Post-Apocalyptic",
+              "rank": 83,
+              "isMediaSpoiler": false
+            },
+            {
+              "name": "Survival",
+              "rank": 85,
+              "isMediaSpoiler": false
+            }
+          ]
         },
         {
           "id": 30013,
@@ -502,7 +729,21 @@
                 }
               }
             ]
-          }
+          },
+          "genres": [
+            "Action",
+            "Adventure",
+            "Comedy",
+            "Drama",
+            "Fantasy"
+          ],
+          "tags": [
+            {
+              "name": "Pirates",
+              "rank": 96,
+              "isMediaSpoiler": false
+            }
+          ]
         },
         {
           "id": 30002,
@@ -549,7 +790,32 @@
                 }
               }
             ]
-          }
+          },
+          "genres": [
+            "Action",
+            "Adventure",
+            "Drama",
+            "Fantasy",
+            "Horror",
+            "Psychological"
+          ],
+          "tags": [
+            {
+              "name": "Gore",
+              "rank": 92,
+              "isMediaSpoiler": false
+            },
+            {
+              "name": "Demons",
+              "rank": 84,
+              "isMediaSpoiler": false
+            },
+            {
+              "name": "Revenge",
+              "rank": 88,
+              "isMediaSpoiler": false
+            }
+          ]
         },
         {
           "id": 30021,
@@ -596,7 +862,25 @@
                 }
               }
             ]
-          }
+          },
+          "genres": [
+            "Mystery",
+            "Psychological",
+            "Supernatural",
+            "Thriller"
+          ],
+          "tags": [
+            {
+              "name": "Detective",
+              "rank": 88,
+              "isMediaSpoiler": false
+            },
+            {
+              "name": "Crime",
+              "rank": 83,
+              "isMediaSpoiler": false
+            }
+          ]
         },
         {
           "id": 30044,
@@ -635,7 +919,29 @@
                 }
               }
             ]
-          }
+          },
+          "genres": [
+            "Drama",
+            "Sci-Fi",
+            "Slice of Life"
+          ],
+          "tags": [
+            {
+              "name": "Space",
+              "rank": 98,
+              "isMediaSpoiler": false
+            },
+            {
+              "name": "Astronauts",
+              "rank": 90,
+              "isMediaSpoiler": false
+            },
+            {
+              "name": "Philosophy",
+              "rank": 72,
+              "isMediaSpoiler": false
+            }
+          ]
         },
         {
           "id": 118586,
@@ -682,7 +988,24 @@
                 }
               }
             ]
-          }
+          },
+          "genres": [
+            "Adventure",
+            "Drama",
+            "Fantasy"
+          ],
+          "tags": [
+            {
+              "name": "Iyashikei",
+              "rank": 77,
+              "isMediaSpoiler": false
+            },
+            {
+              "name": "Elf",
+              "rank": 94,
+              "isMediaSpoiler": false
+            }
+          ]
         }
       ]
     }

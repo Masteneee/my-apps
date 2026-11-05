@@ -25,7 +25,7 @@ function fakeAdapter(
 }
 
 function result(source: MediaSource, type: MediaType, title: string, year = 2001): MediaResult {
-  return { type, source, sourceId: `${source}-${title}`, title, originalTitle: null, year, coverUrl: null, creators: [], totalUnits: null, overview: null };
+  return { type, source, sourceId: `${source}-${title}`, title, originalTitle: null, year, coverUrl: null, creators: [], totalUnits: null, overview: null, genres: [] };
 }
 
 const quiet = () => {}; // instead of console.warn, so test output stays clean

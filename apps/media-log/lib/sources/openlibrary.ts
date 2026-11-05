@@ -5,9 +5,11 @@
 // Two versions behind the SourceAdapter contract, like every adapter:
 // createOpenLibrarySource (real API) and createOpenLibrarySampleSource (saved sample).
 
+import { genreToTags } from "../media/tags";
 import type { MediaResult } from "../media/types";
 import sample from "./samples/openlibrary-search.json";
 import {
+  cleanGenres,
   cleanQuery,
   cleanText,
   cleanTitle,
@@ -33,6 +35,9 @@ export type OpenLibraryDoc = {
   cover_i?: number; // a cover image number, see coverUrl()
   number_of_pages_median?: number;
   edition_count?: number;
+  // Stage 6: free-text subjects typed by librarians, often dozens:
+  // "Science fiction", "Mars (Planet)", "Fiction, science fiction, general"...
+  subject?: string[];
 };
 
 export type OpenLibrarySearchResponse = {
@@ -61,6 +66,16 @@ export function workIdFromKey(key: string): string {
   return key.replace(/^\/works\//, "");
 }
 
+/**
+ * Stage 6: only the subjects our shared tag map understands (lib/media/tags.ts).
+ * A popular book can have 100+ subjects ("Arrakis (Imaginary place)", "Large type
+ * books"...), so keeping all of them would fill the database with words nobody uses.
+ */
+export function openLibraryGenres(subjects: unknown): string[] {
+  if (!Array.isArray(subjects)) return [];
+  return cleanGenres(subjects.filter((s): s is string => typeof s === "string" && genreToTags(s).length > 0));
+}
+
 export function openLibraryDocToMediaResult(doc: OpenLibraryDoc): MediaResult {
   return {
     type: "book",
@@ -75,6 +90,7 @@ export function openLibraryDocToMediaResult(doc: OpenLibraryDoc): MediaResult {
     totalUnits: cleanTotalUnits(doc.number_of_pages_median),
     // The search has no summary; the subtitle is the closest thing.
     overview: cleanText(doc.subtitle),
+    genres: openLibraryGenres(doc.subject),
   };
 }
 
@@ -100,7 +116,7 @@ export const OPEN_LIBRARY_SEARCH_URL = "https://openlibrary.org/search.json";
 
 // Asking for only the fields we use makes the answer much smaller and faster.
 export const OPEN_LIBRARY_FIELDS =
-  "key,title,subtitle,author_name,first_publish_year,cover_i,number_of_pages_median,edition_count";
+  "key,title,subtitle,author_name,first_publish_year,cover_i,number_of_pages_median,edition_count,subject";
 
 export function buildOpenLibraryRequest(query: string, limit: number): { url: string; headers: Record<string, string> } {
   const params = new URLSearchParams({ q: query, fields: OPEN_LIBRARY_FIELDS, limit: String(limit) });

@@ -90,6 +90,8 @@ export function combine(first: MediaResult, second: MediaResult): MediaResult {
     // Only borrow a count from the same type: pages and episodes can't be mixed.
     totalUnits: winner.totalUnits ?? (winner.type === other.type ? other.totalUnits : null),
     overview: winner.overview ?? other.overview,
+    // Stage 6: same rule as creators (the winner's own words, unless it has none).
+    genres: winner.genres.length > 0 ? winner.genres : other.genres,
   };
 }
 

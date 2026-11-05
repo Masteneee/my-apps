@@ -109,6 +109,26 @@ export function uniqueNames(names: unknown[], max: number): string[] {
   return result;
 }
 
+// KEEP IN SYNC with the check on media_items.genres in the Stage 6 migration.
+export const GENRES_MAX = 12;
+
+/**
+ * Stage 6: a source's genre words, trimmed, without blanks or repeats (ignoring
+ * case: "Drama" and "drama" are one), at most GENRES_MAX, each at most 100 characters.
+ */
+export function cleanGenres(names: unknown[]): string[] {
+  const result: string[] = [];
+  const seen = new Set<string>();
+  for (const name of names) {
+    const text = cleanText(name)?.slice(0, 100);
+    if (!text || seen.has(text.toLowerCase())) continue;
+    seen.add(text.toLowerCase());
+    result.push(text);
+    if (result.length === GENRES_MAX) break;
+  }
+  return result;
+}
+
 /**
  * An Error that also says WHAT KIND of problem it was, so code can react to
  * one kind (e.g. a refused key) without reading the message text.

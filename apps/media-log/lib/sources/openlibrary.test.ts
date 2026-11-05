@@ -5,6 +5,7 @@ import {
   createOpenLibrarySampleSource,
   createOpenLibrarySource,
   openLibraryDocToMediaResult,
+  openLibraryGenres,
   searchOpenLibrarySample,
   workIdFromKey,
   type OpenLibrarySearchResponse,
@@ -28,7 +29,18 @@ describe("openLibraryDocToMediaResult", () => {
       creators: ["Frank Herbert"],
       totalUnits: 604,
       overview: null,
+      // Only the subjects our tag map understands (not "Dune (Imaginary place)" or "Large type books").
+      genres: ["Science fiction", "Life on other planets", "Fiction, science fiction, general", "Interplanetary voyages"],
     });
+  });
+
+  it("keeps only the subjects our tag map understands (Stage 6)", () => {
+    expect(openLibraryGenres(["Science fiction", "Arrakis (Imaginary place)", "Large type books", "Space flight -- Fiction"])).toEqual([
+      "Science fiction",
+      "Space flight -- Fiction",
+    ]);
+    expect(openLibraryGenres(undefined)).toEqual([]);
+    expect(openLibraryGenres(["Fantasy fiction", 42, null])).toEqual(["Fantasy fiction"]);
   });
 
   it("uses the subtitle as a short description", () => {

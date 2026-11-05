@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   cleanCoverUrl,
+  cleanGenres,
+  GENRES_MAX,
   cleanTotalUnits,
   cleanYear,
   fetchJson,
@@ -57,6 +59,18 @@ describe("number helpers (they follow the database's rules)", () => {
     expect(cleanCoverUrl("https://a/b.jpg")).toBe("https://a/b.jpg");
     expect(cleanCoverUrl("http://a/b.jpg")).toBeNull();
     expect(cleanCoverUrl("javascript:alert(1)")).toBeNull();
+  });
+});
+
+describe("cleanGenres (Stage 6)", () => {
+  it("trims, drops blanks and non-text, and repeats in any case", () => {
+    expect(cleanGenres([" Drama ", "", null, 7, "drama", "Sci-Fi"])).toEqual(["Drama", "Sci-Fi"]);
+  });
+
+  it("keeps at most GENRES_MAX, each at most 100 characters", () => {
+    const many = Array.from({ length: 20 }, (_, i) => `Genre ${i}`);
+    expect(cleanGenres(many)).toHaveLength(GENRES_MAX);
+    expect(cleanGenres(["x".repeat(150)])[0]).toHaveLength(100);
   });
 });
 

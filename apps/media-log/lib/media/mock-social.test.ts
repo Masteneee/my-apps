@@ -17,6 +17,7 @@ function movie(sourceId: string, title: string): MediaResult {
     creators: [],
     totalUnits: null,
     overview: null,
+    genres: [],
   };
 }
 const interstellar = movie("157336", "Interstellar");

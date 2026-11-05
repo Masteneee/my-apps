@@ -20,8 +20,11 @@ import {
 } from "@/lib/media/display";
 import { diaryDate, formatShortDate } from "@/lib/media/diary";
 import { applyLikeChange } from "@/lib/media/feed";
+import { fillGenres } from "@/lib/media/recommend";
+import { genresToTags, TAG_LABELS } from "@/lib/media/tags";
 import type { MediaItem, MediaItemRef } from "@/lib/media/types";
 import { mediaItemToResult } from "@/lib/media/validation";
+import { sampleCatalog } from "@/lib/sources/catalog";
 import { AddToList } from "./AddToList";
 import { useAuth } from "./AuthProvider";
 import { LogMediaForm } from "./LogMediaForm";
@@ -110,6 +113,8 @@ export function MediaItemView({ itemRef }: { itemRef: MediaItemRef }) {
   const [current, ...earlier] = mine;
   const canLog = status === "signed-in" && !profileLoading && profile !== null;
   const details = [item.creators.join(", "), unitsLabel(item.type, item.total_units)].filter(Boolean).join(" · ");
+  // Stage 6: the shared tags (items cached before Stage 6 borrow genres from the samples).
+  const tags = genresToTags(fillGenres(item, sampleCatalog()).genres);
 
   // After the tracker saves, swap the new version into the list (no reload needed).
   function handleUpdated(updated: LogWithMedia) {
@@ -145,6 +150,15 @@ export function MediaItemView({ itemRef }: { itemRef: MediaItemRef }) {
             {item.title} {item.year && <span className="font-normal text-zinc-400">({item.year})</span>}
           </h1>
           {details && <p className="mt-1 text-zinc-400">{details}</p>}
+          {tags.length > 0 && (
+            <ul className="mt-3 flex flex-wrap gap-2" aria-label="Tags">
+              {tags.map((tag) => (
+                <li key={tag} className="rounded-full border border-zinc-700 px-2.5 py-0.5 text-xs text-zinc-300">
+                  {TAG_LABELS[tag]}
+                </li>
+              ))}
+            </ul>
+          )}
 
           <div className="mt-5 rounded-lg border border-zinc-800 bg-zinc-900 p-4">
             {average.average !== null ? (

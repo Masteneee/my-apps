@@ -868,3 +868,176 @@ Answers
 2. The browser runs code the user controls: anyone can call the Supabase API directly with the public anon key.
    Hiding a button is for comfort; RLS is the real lock.
 3. 0, 2, 3. We always sort by position, and 0 < 2 < 3 is still the right order. The gap closes at the next reorder.
+
+## Stage 6: Stats + "bridge" recommendations (2026-11-05)
+
+### What we built
+- **Genres everywhere.** Every search result and cached item now carries its source's own genre words
+  (`genres`), and one pure function turns them into **one small shared tag set** (21 tags: Space, Sci-Fi, Fantasy,
+  Drama...). TMDB's "Science Fiction", AniList's "Sci-Fi" and Open Library's "Fiction, science fiction, general" all
+  become `sci-fi`, so a movie and a manga can finally be compared. Item pages show the tags as chips.
+- **Stats page** `/u/<username>/stats` (a **Stats** link on every profile): items per media type, a rating
+  histogram with the average, top genres, and a **yearly recap** (entries, finished per type, average, top genre,
+  busiest month, the 3 best-rated posters, a button per year).
+- **Recommendations on the home page** (signed in): **Bridge picks** (anime, manga, games for people who mostly log
+  movies, series and books) and **More for you** (any other media type). Each card says why ("Because you rated
+  Interstellar 5★: shares Sci-Fi, Adventure, Drama") and has a **Log it** button.
+- Works in demo mode and with Supabase, through the same `MediaStore` interface (one new method, `listMediaItems`).
+
+### The plan we followed
+1. Check the data: `MediaResult` and `media_items` had no genres. Add them to the 4 adapters, the samples and a new
+   migration (old migrations stay untouched).
+2. The shared tag map as a pure function (`lib/media/tags.ts`), tested first with the tricky spellings.
+3. The candidate pool: database items (`listMediaItems`) + the saved samples as a catalog (`lib/sources/catalog.ts`).
+4. Scoring, bridge rule and stats as pure functions (`recommend.ts`, `stats.ts`) with tests.
+5. The pages: stats page with plain CSS bars, home picks, tags on item pages.
+6. Lint, tests, build, then a click-through in a headless browser (17 checks, all passing). That click-through found a bad
+   pick (see "Decisions"), which changed the scoring rule.
+
+### New concepts
+
+**Normalizing data from many sources.** Four APIs, four vocabularies, and one source (Open Library) types subjects as
+free text. Instead of comparing raw words, we translate each one into a small set of tags we control: clean it
+(`tagKey`: lowercase, no accents, no punctuation), cut it into pieces ("Sci-Fi & Fantasy" becomes two), then look each
+piece up in an alias table. Unknown words just get no tag. It's the adapter idea from Stage 3, one level deeper.
+
+**Store the raw data, translate when you read.** `media_items.genres` keeps the source's own words, not our tags.
+If we improve the alias table later (say "Cyberpunk" should also be "Thriller"), every item already in the database
+benefits right away. If we stored tags, we'd have to rewrite old rows. The cost: the translation runs on each read.
+That's cheap here, a few hundred short arrays.
+
+**Rule-based recommendations ("content-based filtering").** Big apps learn from millions of users ("people who
+liked X also liked Y"). We don't have millions of users, so we compare the *content* instead: your favorites' tags against
+each candidate's tags. Every pick comes from one rule you can read, so the app can always say *why*. That is the main
+advantage over a black-box model, and it's what makes it testable with plain arrays.
+
+**A scoring function.** Score = (shared tag points) × (rating − 3). Each shared tag is 1 point, a broad one (Drama,
+Action, Adventure, Comedy) 0.5. A 5★ favorite multiplies by 2, a 4★ one by 1. Interstellar (5★) and Cowboy Bebop
+share Sci-Fi (1) + Adventure (0.5) + Drama (0.5) = 2, times 2 = **4**. A candidate keeps its best score, and that
+favorite becomes the reason shown. Ties are broken by fixed rules (more favorites matched, then A to Z), so the
+order never changes randomly between reloads.
+
+**Deterministic sorting with `||`.** `b.score - a.score || b.favoritesMatched - a.favoritesMatched || a.title.localeCompare(b.title)`:
+a sort comparator returns a negative number, 0 or a positive number. `||` moves to the next rule only when the
+previous one gives 0 (a tie), because 0 counts as "false" in JavaScript.
+
+**Aggregations (counting and grouping).** Stats are "group by, then count", like SQL's `GROUP BY`, done in JavaScript
+with a `Map` (tag to count) or an object with every media type set to 0 first (so "0 Games" still shows). The rule
+"each item once" reuses `latestLogPerItem` from Stage 4. Pure functions again, so `stats.test.ts` checks them with
+tiny made-up logs.
+
+**Charts without a library.** A bar is a grey box with a violet box inside whose `width` is a percentage
+(`style={{ width: "75%" }}`). `barPercent(count, max)` does the math; the biggest bar is 100%. Vertical bars
+(the rating histogram) use `height` the same way inside a flex row with `items-end`. Inline `style` is right
+here because the value is computed; Tailwind classes are for fixed values.
+
+**Caching a computed value (memoization).** `sampleCatalog()` converts 64 sample entries with the real adapters,
+then removes duplicates. It does that once and remembers the answer in a variable (`cached ??= ...`). `??=` means
+"assign only if it's still null or undefined".
+
+**Backfilling old rows.** Items cached before this stage have `genres = '{}'`. Users can't update `media_items`
+(no RLS update policy, on purpose since Stage 2), so instead the app borrows genres from the samples when it reads an
+old item (`fillGenres`). The demo store gives old saves `genres: []` when it loads them, like the database's default.
+
+### New dependencies
+None. The bars are plain HTML/CSS; a chart library (Recharts, Chart.js) would add 50+ KB of JavaScript for
+5 simple bar charts. (The browser click-through used the Playwright already installed on the machine, from a throwaway
+script outside the app.)
+
+### Files and what each one does
+- `supabase/migrations/20261105040000_media_genres.sql` (new) adds `media_items.genres text[]` (default `'{}'`) with a
+  check: at most 12 words, no empty slots, no giant text.
+- `lib/media/tags.ts` (new) the 21 shared tags, their labels, the alias table, `tagKey`, `genreToTags`,
+  `genresToTags`, `sortTags`, `tagListLabel`. Tests: `tags.test.ts`.
+- `lib/media/recommend.ts` (new) favorites, the candidate pool, `pairScore`, `scoreCandidate`, `recommend`,
+  `reasonText`, the bridge rule (`bridgeAudience`), `spreadByType`, `bridgePicks`, `fillGenres`. Tests: `recommend.test.ts`.
+- `lib/media/stats.ts` (new) `ratingDistribution`, `topTags`, `recapYears`, `yearlyRecap`, `barPercent`, `maxCount`.
+  Tests: `stats.test.ts`.
+- `lib/sources/catalog.ts` (new) `sampleCatalog()`: the saved samples through the real adapters, deduplicated.
+  Tests: `catalog.test.ts`.
+- `lib/sources/tmdb.ts` the genre number → name table (`TMDB_GENRES`, `tmdbGenreNames`).
+- `lib/sources/anilist.ts` asks for `genres` and `tags`; `aniListGenres` keeps genres + strong, non-spoiler, known tags.
+- `lib/sources/openlibrary.ts` asks for `subject`; `openLibraryGenres` keeps only subjects the tag map knows.
+- `lib/sources/igdb.ts` asks for `genres.name` and `themes.name`, keeps both.
+- `lib/sources/shared.ts` `cleanGenres` and `GENRES_MAX`. `lib/sources/merge.ts` a merged result keeps or borrows genres.
+- `lib/sources/samples/*.json` AniList genres + tags, Open Library subjects, IGDB genres + themes (TMDB already had
+  `genre_ids`). Written from memory, like the rest of the samples.
+- `lib/media/types.ts` `genres` on `MediaResult` and `MediaItem`; `listMediaItems()` on `MediaStore`; `MEDIA_POOL_LIMIT`.
+- `lib/media/validation.ts` genres are cached with the item. `lib/media/mock.ts` + `supabase.ts` read/write
+  `genres`, implement `listMediaItems`; a friendly error when the Stage 6 migration is missing.
+- `lib/demo/seed.ts` the demo items carry their genres (the seed test checks they still match the samples).
+- `app/u/[username]/stats/page.tsx`, `components/StatsView.tsx` (new) the stats page.
+- `components/HomePicks.tsx` (new) bridge picks + more for you; `app/page.tsx` shows it under the landing text.
+- `components/MediaItemView.tsx` tag chips. `components/ProfileView.tsx` the Stats link.
+- Tests updated for the new `genres` field: adapter tests, `merge`, `shared`, `mock`, `validation`, and fixtures in
+  `diary`, `display`, `feed`, `mock-social`, `unified`.
+
+Tests: 383 in 26 files (321 in 22 before this stage).
+
+### Most important lines
+```ts
+const whole = tagsOfKey(tagKey(genre));
+if (whole.length > 0) return sortTags(whole);
+const found = genre.split(PIECE_SEPARATORS).flatMap((piece) => tagsOfKey(tagKey(piece)));
+```
+In `genreToTags` (`lib/media/tags.ts`): try the whole phrase first ("Detective and mystery stories" has its own meaning),
+and only then cut it into pieces ("Fiction, science fiction, general" becomes 3 pieces, one of them known).
+
+```ts
+const points = sharedTags.reduce((sum, tag) => sum + tagPoints(tag), 0);
+return { score: points * (favorite.rating - 3), sharedTags };
+```
+In `pairScore` (`lib/media/recommend.ts`): the whole recommendation engine is this one formula.
+
+```ts
+if (favorite.type === candidate.media.type) return { score: 0, sharedTags: [] };
+```
+The "cross-media" part: a movie never recommends another movie.
+
+### Decisions
+- **The bridge rule:** mainstream = movie, series, book; niche = anime, manga, game. You get bridge picks when
+  you logged at least 3 different items and at least 75% (3 out of 4) of them are mainstream, every status counted.
+  Picks come only from your mainstream 4★+ favorites, only niche candidates, and the best of each niche type comes
+  first (`spreadByType`), so you see an anime, a manga and a game side by side. Below 3 items the page says how many
+  you have; above 25% niche it says you don't need a bridge and shows "More for you" only.
+- **Broad tags count half.** The first version gave every tag 1 point. Clicking through, an Interstellar fan got
+  *Berserk* (a gory dark-fantasy manga) as a bridge pick instead of *Planetes* (a space manga), just because Berserk
+  shares Adventure + Drama and won the tie. With broad tags at 0.5, one specific tag (Sci-Fi) beats two broad ones.
+  A test now pins this case.
+- **Candidate pool = our database + the saved samples.** No live catalog crawling (PLAN.md: never store whole
+  catalogs, and there's no internet here). With Supabase, `listMediaItems` reads the 500 newest cached items. Items only
+  in the samples have no item page yet, so their card has no link, but **Log it** works (that caches them).
+- **"More for you" is spread over types too**, otherwise TMDB series (which TMDB tags "Sci-Fi & Fantasy") filled it.
+- **TMDB lumps genres for series:** "Sci-Fi & Fantasy" gives both tags, so *The Witcher* series counts as Sci-Fi.
+  We can't split what TMDB doesn't say. Movies have separate genres, and TMDB search has no "Space" (that would need
+  its keywords endpoint, one more request per item), so Interstellar is Sci-Fi/Adventure/Drama, not Space.
+- **Open Library and AniList tags are filtered before saving** (only words the tag map knows, AniList tags ranked
+  60+/100 and not spoilers). A book can have 100+ subjects; the fixed genre lists (TMDB, AniList genres, IGDB) are kept whole.
+- **Old items:** no update policy on `media_items` (unchanged since Stage 2), so items cached before Stage 6 stay
+  `'{}'` in the database; the app borrows genres from the samples when it can. Live-searched items logged before
+  Stage 6 (not in the samples) stay without tags: logging them again reuses the cached copy. A later stage could
+  refresh them. Supabase isn't set up yet, so today that only affects demo saves.
+- **Stats rules:** an item counts once (latest log) everywhere, except the recap's "entries" and "finished", which
+  count diary entries (a rewatch is a new entry). "Want to" items don't count in top genres.
+- **Not tested against a real Supabase project** (no internet). Demo mode was clicked through in a headless browser.
+
+### Practice exercise
+Add a **"Hours played"** line to the yearly recap. In `lib/media/stats.ts`, add `hoursPlayed: number` to `YearRecap`:
+the sum of `progress` for that year's logs whose `progress_unit` is `"hour"`, counting each item once (use
+`latestLogPerItem`). In `stats.test.ts`, add a test: a game finished with 22 hours and another at 31.5 hours give
+53.5; a game logged twice counts only its latest log; a manga at chapter 14 adds nothing. Then show
+"53.5 hours played" in `components/StatsView.tsx` when it's above 0. Bonus: why must `latestLogPerItem` get the
+logs newest first?
+
+### Quiz
+1. Why do we save "Science Fiction" in `media_items.genres` instead of our own tag `sci-fi`?
+2. You rated Interstellar 4★ and The Hobbit 5★. A candidate game shares Sci-Fi with Interstellar and Fantasy with
+   The Hobbit. What's its score, and which reason is shown?
+3. Someone logged 6 movies and 2 anime. Do they get bridge picks? And with 6 movies and 3 anime?
+
+Answers
+1. So the translation can improve later without touching the database: change the alias table and every old item
+   gets the better tags the next time it's read. Our tags are a choice we might change; the source's words are facts.
+2. Interstellar: 1 point × (4 − 3) = 1. The Hobbit: 1 point × (5 − 3) = 2. The best one wins: score 2, "Because you
+   rated The Hobbit 5★: shares Fantasy". (favoritesMatched is 2, used only to break ties.)
+3. 6 of 8 = 75%: yes, exactly on the line. 6 of 9 = 67%: no, they already log niche media, so only "More for you".

@@ -11,6 +11,7 @@ import {
   posterUrl,
   searchTmdbMovieSample,
   searchTmdbTvSample,
+  tmdbGenreNames,
   tmdbMovieToMediaResult,
   tmdbTvToMediaResult,
   type TmdbMovie,
@@ -40,6 +41,7 @@ describe("tmdbMovieToMediaResult", () => {
       creators: [],
       totalUnits: null,
       overview: interstellar.overview,
+      genres: ["Adventure", "Drama", "Science Fiction"], // from genre_ids [12, 18, 878]
     });
   });
 
@@ -84,7 +86,17 @@ describe("tmdbTvToMediaResult", () => {
       creators: [],
       totalUnits: null,
       overview: attackOnTitan.overview,
+      genres: ["Animation", "Action & Adventure", "Sci-Fi & Fantasy"],
     });
+  });
+});
+
+describe("tmdbGenreNames (Stage 6)", () => {
+  it("turns TMDB's genre numbers into names, skipping unknown ones", () => {
+    expect(tmdbGenreNames([878, 18])).toEqual(["Science Fiction", "Drama"]);
+    expect(tmdbGenreNames([10765, 123456])).toEqual(["Sci-Fi & Fantasy"]);
+    expect(tmdbGenreNames(undefined)).toEqual([]);
+    expect(tmdbGenreNames(["878"])).toEqual([]); // not a number
   });
 });
 

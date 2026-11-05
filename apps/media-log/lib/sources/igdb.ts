@@ -14,6 +14,7 @@
 import type { MediaResult } from "../media/types";
 import sample from "./samples/igdb-games.json";
 import {
+  cleanGenres,
   cleanQuery,
   cleanText,
   cleanTitle,
@@ -37,6 +38,11 @@ export type IgdbGame = {
   summary?: string;
   cover?: { id: number; image_id: string };
   involved_companies?: { id: number; developer: boolean; company: { id: number; name: string } }[];
+  // Stage 6. Genres say how it PLAYS ("Shooter", "Role-playing (RPG)"); themes say
+  // what it's ABOUT ("Science fiction", "Horror"). We keep both; lib/media/tags.ts
+  // only gives a tag to the ones that mean something in other media too.
+  genres?: { id: number; name: string }[];
+  themes?: { id: number; name: string }[];
 };
 
 /** IGDB answers with a plain list of games (no wrapper object). */
@@ -77,6 +83,7 @@ export function igdbGameToMediaResult(game: IgdbGame): MediaResult {
     creators: uniqueNames((developers.length ? developers : companies).map((c) => c.company?.name), 2),
     totalUnits: null, // games have no episodes or pages; Stage 4 tracks hours instead
     overview: cleanText(game.summary),
+    genres: cleanGenres([...(game.genres ?? []), ...(game.themes ?? [])].map((g) => g?.name)),
   };
 }
 
@@ -161,7 +168,7 @@ export function buildIgdbQuery(query: string, limit: number): string {
   const escaped = query.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
   return [
     `search "${escaped}";`,
-    "fields name,first_release_date,summary,cover.image_id,involved_companies.developer,involved_companies.company.name;",
+    "fields name,first_release_date,summary,cover.image_id,involved_companies.developer,involved_companies.company.name,genres.name,themes.name;",
     // version_parent = null: skip "Deluxe/GOTY edition" copies of the same game.
     // themes != (42): skip adult games (theme 42 is "Erotic").
     "where version_parent = null & themes != (42);",

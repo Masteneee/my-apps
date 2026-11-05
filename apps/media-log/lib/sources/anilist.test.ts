@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  aniListGenres,
   aniListMediaToMediaResult,
   buildAniListQuery,
   buildAniListRequest,
@@ -35,6 +36,8 @@ describe("aniListMediaToMediaResult", () => {
       // HTML tags removed, line breaks become spaces.
       overview:
         "Several hundred years ago, humans were nearly exterminated by titans. Titans are typically several stories tall, seem to have no intelligence and devour human beings. (Source: our own summary)",
+      // Genres, then the strong, non-spoiler tags we understand (see the next tests).
+      genres: ["Action", "Drama", "Fantasy", "Mystery", "Military", "Post-Apocalyptic"],
     });
   });
 
@@ -62,6 +65,36 @@ describe("aniListMediaToMediaResult", () => {
       studios: null,
     });
     expect(result).toMatchObject({ totalUnits: null, coverUrl: null, year: null, overview: null, creators: [] });
+  });
+});
+
+describe("aniListGenres (Stage 6)", () => {
+  const tag = (name: string, rank: number | null, isMediaSpoiler: boolean | null = false) => ({ name, rank, isMediaSpoiler });
+
+  it("keeps every genre, then tags that are strong, not spoilers, and known to our tag map", () => {
+    expect(
+      aniListGenres({
+        genres: ["Drama", "Sci-Fi"],
+        tags: [
+          tag("Space", 97), // kept
+          tag("Music", 50), // too weak (rank under 60)
+          tag("War", 85, true), // a spoiler
+          tag("Male Protagonist", 90), // not a tag we use
+          tag("Iyashikei", 60), // exactly 60 is enough
+          tag("Survival", null), // no rank
+        ],
+      }),
+    ).toEqual(["Drama", "Sci-Fi", "Space", "Iyashikei"]);
+  });
+
+  it("handles missing genres and tags (older saves, odd answers)", () => {
+    expect(aniListGenres({ genres: null, tags: null })).toEqual([]);
+    expect(aniListGenres({})).toEqual([]);
+  });
+
+  it("asks AniList for genres and tags", () => {
+    expect(buildAniListQuery(["anime"])).toContain("tags { name rank isMediaSpoiler }");
+    expect(buildAniListQuery(["anime"])).toMatch(/\n  genres\n/);
   });
 });
 

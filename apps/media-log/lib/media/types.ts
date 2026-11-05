@@ -40,6 +40,11 @@ export type MediaResult = {
   creators: string[];
   totalUnits: number | null; // episodes (series, anime), chapters (manga), pages (books)
   overview: string | null; // short description, shown in search only (not stored)
+  /**
+   * Stage 6: the source's OWN genre words ("Science Fiction", "Sci-Fi", "Space"...),
+   * at most GENRES_MAX. lib/media/tags.ts turns them into our shared tags. [] = unknown.
+   */
+  genres: string[];
 };
 
 /** One row of `media_items`: a cached copy of a result, made when someone logs it. */
@@ -53,6 +58,7 @@ export type MediaItem = {
   cover_url: string | null;
   creators: string[];
   total_units: number | null;
+  genres: string[]; // Stage 6 (see MediaResult.genres). '{}' in the database = unknown
   cached_at: string; // ISO date-time
 };
 
@@ -225,4 +231,15 @@ export interface MediaStore {
    * to last. Throws if an item is missing or extra (e.g. changed in another tab).
    */
   reorderList(listId: string, orderedMediaItemIds: string[]): Promise<ListWithItems>;
+
+  // ----- Stage 6: recommendations -----
+
+  /**
+   * Cached media items (anyone's), newest first, at most MEDIA_POOL_LIMIT.
+   * Recommendations pick from these plus the saved samples (lib/sources/catalog.ts).
+   */
+  listMediaItems(): Promise<MediaItem[]>;
 }
+
+/** The most media items listMediaItems() returns (keeps the request small). */
+export const MEDIA_POOL_LIMIT = 500;

@@ -25,7 +25,31 @@
         }
       }
     ],
-    "summary": "Geralt of Rivia, a monster hunter for hire, searches a war-torn open world for his adopted daughter, who is hunted by the Wild Hunt."
+    "summary": "Geralt of Rivia, a monster hunter for hire, searches a war-torn open world for his adopted daughter, who is hunted by the Wild Hunt.",
+    "genres": [
+      {
+        "id": 12,
+        "name": "Role-playing (RPG)"
+      },
+      {
+        "id": 31,
+        "name": "Adventure"
+      }
+    ],
+    "themes": [
+      {
+        "id": 1,
+        "name": "Action"
+      },
+      {
+        "id": 17,
+        "name": "Fantasy"
+      },
+      {
+        "id": 38,
+        "name": "Open world"
+      }
+    ]
   },
   {
     "id": 80,
@@ -53,7 +77,23 @@
         }
       }
     ],
-    "summary": "Geralt, a witcher who has lost his memory, is pulled into a fight over a stolen mutagen formula."
+    "summary": "Geralt, a witcher who has lost his memory, is pulled into a fight over a stolen mutagen formula.",
+    "genres": [
+      {
+        "id": 12,
+        "name": "Role-playing (RPG)"
+      }
+    ],
+    "themes": [
+      {
+        "id": 1,
+        "name": "Action"
+      },
+      {
+        "id": 17,
+        "name": "Fantasy"
+      }
+    ]
   },
   {
     "id": 119133,
@@ -81,7 +121,31 @@
         }
       }
     ],
-    "summary": "An open-world action role-playing game set in the Lands Between, a realm shattered after the Elden Ring was broken."
+    "summary": "An open-world action role-playing game set in the Lands Between, a realm shattered after the Elden Ring was broken.",
+    "genres": [
+      {
+        "id": 12,
+        "name": "Role-playing (RPG)"
+      },
+      {
+        "id": 31,
+        "name": "Adventure"
+      }
+    ],
+    "themes": [
+      {
+        "id": 1,
+        "name": "Action"
+      },
+      {
+        "id": 17,
+        "name": "Fantasy"
+      },
+      {
+        "id": 38,
+        "name": "Open world"
+      }
+    ]
   },
   {
     "id": 14593,
@@ -101,7 +165,31 @@
         }
       }
     ],
-    "summary": "A tiny knight explores a vast ruined kingdom of insects, full of secrets, bosses and new paths."
+    "summary": "A tiny knight explores a vast ruined kingdom of insects, full of secrets, bosses and new paths.",
+    "genres": [
+      {
+        "id": 8,
+        "name": "Platform"
+      },
+      {
+        "id": 31,
+        "name": "Adventure"
+      },
+      {
+        "id": 32,
+        "name": "Indie"
+      }
+    ],
+    "themes": [
+      {
+        "id": 1,
+        "name": "Action"
+      },
+      {
+        "id": 17,
+        "name": "Fantasy"
+      }
+    ]
   },
   {
     "id": 7346,
@@ -129,7 +217,27 @@
         }
       }
     ],
-    "summary": "Link wakes up after a hundred years of sleep and explores a huge open Hyrule to defeat Calamity Ganon."
+    "summary": "Link wakes up after a hundred years of sleep and explores a huge open Hyrule to defeat Calamity Ganon.",
+    "genres": [
+      {
+        "id": 31,
+        "name": "Adventure"
+      }
+    ],
+    "themes": [
+      {
+        "id": 1,
+        "name": "Action"
+      },
+      {
+        "id": 17,
+        "name": "Fantasy"
+      },
+      {
+        "id": 38,
+        "name": "Open world"
+      }
+    ]
   },
   {
     "id": 1009,
@@ -157,7 +265,35 @@
         }
       }
     ],
-    "summary": "Joel, a smuggler, escorts the teenager Ellie across a post-pandemic United States."
+    "summary": "Joel, a smuggler, escorts the teenager Ellie across a post-pandemic United States.",
+    "genres": [
+      {
+        "id": 5,
+        "name": "Shooter"
+      },
+      {
+        "id": 31,
+        "name": "Adventure"
+      }
+    ],
+    "themes": [
+      {
+        "id": 1,
+        "name": "Action"
+      },
+      {
+        "id": 19,
+        "name": "Horror"
+      },
+      {
+        "id": 21,
+        "name": "Survival"
+      },
+      {
+        "id": 31,
+        "name": "Drama"
+      }
+    ]
   },
   {
     "id": 150010,
@@ -185,7 +321,35 @@
         }
       }
     ],
-    "summary": "A real-time strategy game where houses fight for control of the spice on the desert planet Arrakis."
+    "summary": "A real-time strategy game where houses fight for control of the spice on the desert planet Arrakis.",
+    "genres": [
+      {
+        "id": 15,
+        "name": "Strategy"
+      },
+      {
+        "id": 11,
+        "name": "Real Time Strategy (RTS)"
+      },
+      {
+        "id": 32,
+        "name": "Indie"
+      }
+    ],
+    "themes": [
+      {
+        "id": 18,
+        "name": "Science fiction"
+      },
+      {
+        "id": 39,
+        "name": "Warfare"
+      },
+      {
+        "id": 41,
+        "name": "4X (explore, expand, exploit, and exterminate)"
+      }
+    ]
   },
   {
     "id": 2118,
@@ -213,7 +377,27 @@
         }
       }
     ],
-    "summary": "Three houses compete to harvest spice on Arrakis in one of the first real-time strategy games."
+    "summary": "Three houses compete to harvest spice on Arrakis in one of the first real-time strategy games.",
+    "genres": [
+      {
+        "id": 11,
+        "name": "Real Time Strategy (RTS)"
+      },
+      {
+        "id": 15,
+        "name": "Strategy"
+      }
+    ],
+    "themes": [
+      {
+        "id": 18,
+        "name": "Science fiction"
+      },
+      {
+        "id": 39,
+        "name": "Warfare"
+      }
+    ]
   },
   {
     "id": 113112,
@@ -233,7 +417,31 @@
         }
       }
     ],
-    "summary": "Zagreus, the son of Hades, fights his way out of the underworld, again and again."
+    "summary": "Zagreus, the son of Hades, fights his way out of the underworld, again and again.",
+    "genres": [
+      {
+        "id": 12,
+        "name": "Role-playing (RPG)"
+      },
+      {
+        "id": 25,
+        "name": "Hack and slash/Beat 'em up"
+      },
+      {
+        "id": 32,
+        "name": "Indie"
+      }
+    ],
+    "themes": [
+      {
+        "id": 1,
+        "name": "Action"
+      },
+      {
+        "id": 17,
+        "name": "Fantasy"
+      }
+    ]
   },
   {
     "id": 17000,
@@ -261,7 +469,31 @@
         }
       }
     ],
-    "summary": "You inherit your grandfather's old farm and start a new life in a small town."
+    "summary": "You inherit your grandfather's old farm and start a new life in a small town.",
+    "genres": [
+      {
+        "id": 13,
+        "name": "Simulator"
+      },
+      {
+        "id": 12,
+        "name": "Role-playing (RPG)"
+      },
+      {
+        "id": 32,
+        "name": "Indie"
+      }
+    ],
+    "themes": [
+      {
+        "id": 33,
+        "name": "Sandbox"
+      },
+      {
+        "id": 44,
+        "name": "Romance"
+      }
+    ]
   },
   {
     "id": 11737,
@@ -289,6 +521,34 @@
         }
       }
     ],
-    "summary": "An astronaut explores a small solar system stuck in a 22-minute time loop."
+    "summary": "An astronaut explores a small solar system stuck in a 22-minute time loop.",
+    "genres": [
+      {
+        "id": 9,
+        "name": "Puzzle"
+      },
+      {
+        "id": 31,
+        "name": "Adventure"
+      },
+      {
+        "id": 32,
+        "name": "Indie"
+      }
+    ],
+    "themes": [
+      {
+        "id": 18,
+        "name": "Science fiction"
+      },
+      {
+        "id": 43,
+        "name": "Mystery"
+      },
+      {
+        "id": 38,
+        "name": "Open world"
+      }
+    ]
   }
 ]

@@ -38,6 +38,7 @@ function log(id: string, userId: string, minute: number, extra: Partial<LogWithM
       cover_url: null,
       creators: [],
       total_units: null,
+      genres: [],
       cached_at: "2026-11-05T12:00:00.000Z",
     },
     ...extra,

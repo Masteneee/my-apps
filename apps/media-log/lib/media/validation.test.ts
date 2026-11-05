@@ -22,6 +22,7 @@ const movie: MediaResult = {
   creators: [],
   totalUnits: null,
   overview: "Space.",
+  genres: ["Science Fiction"],
 };
 
 // A valid form; each test changes only the part it's about.
@@ -160,6 +161,7 @@ describe("mediaItemFields", () => {
       cover_url: "https://image.tmdb.org/t/p/w342/poster.jpg",
       creators: [],
       total_units: null,
+      genres: ["Science Fiction"], // Stage 6: cached with the item
     });
   });
 });

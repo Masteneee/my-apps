@@ -13,6 +13,7 @@ function r(partial: Partial<MediaResult> & Pick<MediaResult, "type" | "title">):
     creators: [],
     totalUnits: null,
     overview: null,
+    genres: [],
     ...partial,
   };
 }
@@ -84,6 +85,14 @@ describe("combine", () => {
     const series = r({ type: "series", title: "Attack on Titan", totalUnits: 87 });
     const anime = r({ type: "anime", source: "anilist", title: "Attack on Titan", totalUnits: null });
     expect(combine(series, anime).totalUnits).toBeNull();
+  });
+
+  it("keeps the winner's genres, or borrows them when it has none (Stage 6)", () => {
+    const withGenres = r({ type: "movie", title: "Dune", sourceId: "A", genres: ["Science Fiction"] });
+    const without = r({ type: "movie", title: "Dune", sourceId: "B" });
+    expect(combine(without, withGenres).genres).toEqual(["Science Fiction"]);
+    const anime = r({ type: "anime", source: "anilist", title: "Dune", genres: ["Sci-Fi"] });
+    expect(combine(withGenres, anime).genres).toEqual(["Sci-Fi"]); // the anime wins, with its own words
   });
 });
 

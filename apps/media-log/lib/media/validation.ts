@@ -202,6 +202,7 @@ export function mediaItemFields(result: MediaResult): Omit<MediaItem, "id" | "ca
     cover_url: result.coverUrl,
     creators: result.creators,
     total_units: result.totalUnits,
+    genres: result.genres,
   };
 }
 
@@ -222,5 +223,6 @@ export function mediaItemToResult(item: MediaItem): MediaResult {
     creators: item.creators,
     totalUnits: item.total_units,
     overview: null,
+    genres: item.genres,
   };
 }

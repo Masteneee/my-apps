@@ -6,22 +6,24 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { attachSocial, buildFeed, FEED_LIMIT, likeProblem } from "./feed";
 import { validateListInput } from "./lists";
 import { nextPosition, positionChanges, sortByPosition } from "./reorder";
-import type {
-  ListItemWithMedia,
-  ListWithItems,
-  Log,
-  LogWithMedia,
-  MediaItem,
-  MediaList,
-  MediaResult,
-  MediaStore,
-  PublicProfile,
-  ReviewLike,
-  SocialLog,
+import {
+  MEDIA_POOL_LIMIT,
+  type ListItemWithMedia,
+  type ListWithItems,
+  type Log,
+  type LogWithMedia,
+  type MediaItem,
+  type MediaList,
+  type MediaResult,
+  type MediaStore,
+  type PublicProfile,
+  type ReviewLike,
+  type SocialLog,
 } from "./types";
 import { localToday, mediaItemFields, planLogUpdate, validateLogInput } from "./validation";
 
-const MEDIA_COLUMNS = "id, type, source, source_id, title, year, cover_url, creators, total_units, cached_at";
+// `genres` since Stage 6: without that migration, every request that reads items fails (see friendlyMediaError).
+const MEDIA_COLUMNS = "id, type, source, source_id, title, year, cover_url, creators, total_units, genres, cached_at";
 const LOG_COLUMNS =
   "id, user_id, media_item_id, status, rating, progress, progress_unit, review_text, started_at, finished_at, rewatch, created_at";
 // "media:media_items(...)" asks Supabase to also fetch the media item each log
@@ -64,8 +66,11 @@ export function friendlyMediaError(error: { code?: string; message: string }): s
       return "The media tables don't exist yet. Run the Stage 2 migration in Supabase (see README.md).";
     case "22P02": // Postgres: "invalid input syntax", e.g. a list id that isn't a real id
       return "That link doesn't look right.";
-    case "42703": // Postgres: column doesn't exist (reading progress_unit)
-    case "PGRST204": // Supabase API: column not found (writing progress_unit)
+    case "42703": // Postgres: column doesn't exist (reading progress_unit or genres)
+    case "PGRST204": // Supabase API: column not found (writing progress_unit or genres)
+      if (error.message?.includes("genres")) {
+        return "The database is missing the Stage 6 genres column. Run the Stage 6 migration in Supabase (see README.md).";
+      }
       return "The database is missing the Stage 4 progress columns. Run the Stage 4 migration in Supabase (see README.md).";
     default:
       return error.message || "Something went wrong. Please try again.";
@@ -417,6 +422,20 @@ export function createSupabaseMediaStore(supabase: SupabaseClient): MediaStore {
       const failed = results.find((result) => result.error);
       if (failed?.error) throw new Error(friendlyMediaError(failed.error));
       return reloadList(listId);
+    },
+
+    // ----- Stage 6: recommendations -----
+
+    async listMediaItems() {
+      // Media items are public facts (the Stage 2 select policy lets anyone read them).
+      // Newest first, and a limit, so this stays one small request as the table grows.
+      const { data, error } = await supabase
+        .from("media_items")
+        .select(MEDIA_COLUMNS)
+        .order("cached_at", { ascending: false })
+        .limit(MEDIA_POOL_LIMIT);
+      if (error) throw new Error(friendlyMediaError(error));
+      return data as MediaItem[];
     },
   };
 }

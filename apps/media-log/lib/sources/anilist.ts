@@ -7,10 +7,12 @@
 // Two versions behind the SourceAdapter contract, like every adapter:
 // createAniListSource (real API) and createAniListSampleSource (saved sample).
 
+import { genreToTags } from "../media/tags";
 import type { MediaResult } from "../media/types";
 import sample from "./samples/anilist-search.json";
 import {
   cleanCoverUrl,
+  cleanGenres,
   cleanQuery,
   cleanTitle,
   cleanTotalUnits,
@@ -44,6 +46,12 @@ export type AniListMedia = {
   // Anime: the animation studio. Manga: the people who wrote/drew it.
   studios: { nodes: { name: string }[] } | null;
   staff: { edges: { role: string; node: { name: { full: string | null } } }[] } | null;
+  // Stage 6. `genres` is AniList's short fixed list ("Action", "Sci-Fi", "Slice of Life"...).
+  // `tags` are hundreds of finer labels ("Space", "Iyashikei"...), each with a `rank`:
+  // how strongly it applies, 0 to 100, voted by users. Some tags give away the
+  // story, so AniList marks them `isMediaSpoiler`. Both may be missing in older saves.
+  genres?: string[] | null;
+  tags?: { name: string; rank: number | null; isMediaSpoiler: boolean | null }[] | null;
 };
 
 /** Our query asks for an "anime" part and/or a "manga" part (see buildAniListQuery). */
@@ -61,6 +69,23 @@ export type AniListSearchResponse = {
 
 // Manga staff roles that count as "creators" (not translators, letterers...).
 const CREATOR_ROLE = /story|art|original creator/i;
+
+// Stage 6: a tag must apply at least this much (AniList's rank, out of 100) to count.
+export const ANILIST_TAG_MIN_RANK = 60;
+
+/**
+ * The genre words we keep for one entry: every genre (a short fixed list), then
+ * the tags that are strong enough, aren't spoilers, and that our shared tag map
+ * understands (lib/media/tags.ts). Unknown tags like "Male Protagonist" are dropped,
+ * so we don't store hundreds of words nobody uses.
+ */
+export function aniListGenres(media: Pick<AniListMedia, "genres" | "tags">): string[] {
+  const tags = (media.tags ?? [])
+    .filter((tag) => (tag.rank ?? 0) >= ANILIST_TAG_MIN_RANK && tag.isMediaSpoiler !== true)
+    .map((tag) => tag.name)
+    .filter((name) => typeof name === "string" && genreToTags(name).length > 0);
+  return cleanGenres([...(media.genres ?? []), ...tags]);
+}
 
 /** One AniList entry -> one MediaResult. */
 export function aniListMediaToMediaResult(media: AniListMedia): MediaResult {
@@ -92,6 +117,7 @@ export function aniListMediaToMediaResult(media: AniListMedia): MediaResult {
     // Anime are counted in episodes, manga in chapters (Stage 4 tracks progress).
     totalUnits: cleanTotalUnits(isAnime ? media.episodes : media.chapters),
     overview: stripHtml(media.description),
+    genres: aniListGenres(media),
   };
 }
 
@@ -147,6 +173,8 @@ const MEDIA_FIELDS = `fragment mediaFields on Media {
   isAdult
   studios(isMain: true) { nodes { name } }
   staff(perPage: 4, sort: [RELEVANCE, ID]) { edges { role node { name { full } } } }
+  genres
+  tags { name rank isMediaSpoiler }
 }`;
 
 /**

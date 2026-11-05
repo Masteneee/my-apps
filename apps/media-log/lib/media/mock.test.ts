@@ -15,6 +15,7 @@ function result(sourceId: string, title: string): MediaResult {
     creators: [],
     totalUnits: null,
     overview: null,
+    genres: [],
   };
 }
 const interstellar = result("157336", "Interstellar");
@@ -241,5 +242,33 @@ describe("demo media store: updating progress", () => {
       "doesn't exist",
     );
     expect((await store.getLogsForUser("user-1"))[0].progress).toBe(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Stage 6: genres and the recommendation pool
+// ---------------------------------------------------------------------------
+
+describe("demo media store: genres and listMediaItems", () => {
+  it("caches an item's genres with it", async () => {
+    const log = await store.addLog(logOf({ ...interstellar, genres: ["Science Fiction", "Drama"] }));
+    expect(log.media.genres).toEqual(["Science Fiction", "Drama"]);
+    expect((await makeStore().getLogsForUser("user-1"))[0].media.genres).toEqual(["Science Fiction", "Drama"]);
+  });
+
+  it("gives items saved before Stage 6 an empty genre list", async () => {
+    await store.addLog(logOf(interstellar));
+    const saved = JSON.parse(storage.getItem(MOCK_MEDIA_STORAGE_KEY)!);
+    delete saved.mediaItems[0].genres; // what an old save looks like
+    storage.setItem(MOCK_MEDIA_STORAGE_KEY, JSON.stringify(saved));
+    expect((await store.getLogsForUser("user-1"))[0].media.genres).toEqual([]);
+  });
+
+  it("lists every cached item, newest first, even signed out", async () => {
+    await store.addLog(logOf(interstellar));
+    await store.addLog(logOf(parasite));
+    await store.addLog(logOf(interstellar)); // same item again: still one
+    currentUser = null;
+    expect((await store.listMediaItems()).map((item) => item.title)).toEqual(["Parasite", "Interstellar"]);
   });
 });
