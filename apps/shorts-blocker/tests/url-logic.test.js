@@ -147,3 +147,58 @@ describe('isSnapchatSpotlightUrl', () => {
     expect(isSnapchatSpotlightUrl('')).toBe(false);
   });
 });
+
+// --- Stage 3: edge cases that weren't covered yet ----------------------------
+
+describe('redirect edge cases', () => {
+  it('redirects a relative Shorts link to the desktop site', () => {
+    // Relative links are read as if they were on www.youtube.com (see toUrl).
+    expect(shortsToWatchUrl(`/shorts/${ID}`)).toBe(`https://www.youtube.com/watch?v=${ID}`);
+  });
+
+  it('keeps the bare youtube.com host when that is where you are', () => {
+    expect(shortsToWatchUrl(`https://youtube.com/shorts/${ID}`)).toBe(
+      `https://youtube.com/watch?v=${ID}`
+    );
+  });
+
+  it('never redirects on a lookalike host that only contains "youtube.com"', () => {
+    expect(shortsToWatchUrl(`https://youtube.com.example.com/shorts/${ID}`)).toBeNull();
+    expect(shortsToWatchUrl(`https://notyoutube.com/shorts/${ID}`)).toBeNull();
+  });
+
+  it('accepts IDs with "-" and "_", which real video IDs use', () => {
+    expect(getShortsId('/shorts/a-b_c-d_e-f')).toBe('a-b_c-d_e-f');
+  });
+
+  it('rejects extra path pieces after the ID', () => {
+    expect(getShortsId(`/shorts/${ID}/comments`)).toBeNull();
+  });
+
+  it('does not redirect Instagram lookalikes or other sites', () => {
+    expect(instagramRedirectUrl(`https://notinstagram.com/reel/${CODE}/`)).toBeNull();
+    expect(instagramRedirectUrl('https://example.com/reels/')).toBeNull();
+    expect(instagramRedirectUrl('')).toBeNull();
+  });
+
+  it('works on Instagram subdomains like m.instagram.com', () => {
+    expect(instagramRedirectUrl(`https://m.instagram.com/reel/${CODE}/`)).toBe(
+      `https://www.instagram.com/p/${CODE}/`
+    );
+  });
+
+  it('rejects Instagram codes with characters a real code never has', () => {
+    expect(getInstagramReelCode('https://www.instagram.com/reel/abc%20def/')).toBeNull();
+  });
+
+  it('returns false instead of crashing for empty or non-string input', () => {
+    expect(isFacebookReelUrl(null)).toBe(false);
+    expect(isFacebookReelUrl(42)).toBe(false);
+    expect(isSnapchatSpotlightUrl(undefined)).toBe(false);
+  });
+
+  it('does not treat a Snapchat profile as Spotlight', () => {
+    expect(isSnapchatSpotlightUrl('https://www.snapchat.com/@someone')).toBe(false);
+    expect(isSnapchatSpotlightUrl('https://www.snapchat.com/@someone/stories')).toBe(false);
+  });
+});

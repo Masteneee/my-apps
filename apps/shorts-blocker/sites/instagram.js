@@ -7,7 +7,7 @@
 
 (function () {
   const { instagramRedirectUrl, getInstagramReelCode } = globalThis.ShortsUrl;
-  const { start, hideLinks } = globalThis.BlockerCore;
+  const { start, hideLinks, redirectTo } = globalThis.BlockerCore;
 
   // A feed post is an <article>. In Explore and on profiles there's no
   // <article>, so hideLinks falls back to hiding the tile (the link) itself.
@@ -16,7 +16,7 @@
   function check() {
     const target = instagramRedirectUrl(location.href);
     if (target) {
-      location.replace(target);
+      redirectTo(target);
       return;
     }
     hideLinks('a[href*="/reel/"]', (href) => getInstagramReelCode(href) !== null, POST_SELECTOR);

@@ -3,10 +3,10 @@
 // while the switch is on, the whole site is replaced by our friendly page.
 
 (function () {
-  const { start, blockedPageUrl } = globalThis.BlockerCore;
+  const { start, redirectTo, blockedPageUrl } = globalThis.BlockerCore;
 
   function check() {
-    location.replace(blockedPageUrl());
+    redirectTo(blockedPageUrl());
   }
 
   start('tiktok', check);

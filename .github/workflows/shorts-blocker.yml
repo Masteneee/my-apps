@@ -1,0 +1,31 @@
+# Runs the shorts-blocker tests on GitHub's computers on every push and pull
+# request, but only when something inside apps/shorts-blocker changed.
+name: shorts-blocker
+
+on:
+  push:
+    paths:
+      - 'apps/shorts-blocker/**'
+      - '.github/workflows/shorts-blocker.yml'
+  pull_request:
+    paths:
+      - 'apps/shorts-blocker/**'
+      - '.github/workflows/shorts-blocker.yml'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        # Every "run:" step below starts inside the app folder.
+        working-directory: apps/shorts-blocker
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/shorts-blocker/package-lock.json
+      # npm ci installs exactly what package-lock.json says (faster and stricter than npm install).
+      - run: npm ci
+      - run: npm test

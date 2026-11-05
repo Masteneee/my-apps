@@ -8,7 +8,7 @@
 
 (function () {
   const { isFacebookReelUrl } = globalThis.ShortsUrl;
-  const { start, hideLinks, blockedPageUrl } = globalThis.BlockerCore;
+  const { start, hideLinks, redirectTo, blockedPageUrl } = globalThis.BlockerCore;
 
   // Facebook's class names are random letters that change often, so we use
   // the more stable attributes it puts on each feed post. If neither is found
@@ -17,7 +17,7 @@
 
   function check() {
     if (isFacebookReelUrl(location.href)) {
-      location.replace(blockedPageUrl());
+      redirectTo(blockedPageUrl());
       return;
     }
     hideLinks('a[href*="/reel"]', isFacebookReelUrl, POST_SELECTOR);

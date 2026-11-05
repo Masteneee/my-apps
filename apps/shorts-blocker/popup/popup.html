@@ -6,15 +6,36 @@
     <link rel="stylesheet" href="popup.css" />
   </head>
   <body>
-    <h1>Short-Form Blocker</h1>
-    <p class="hint">Switch blocking on or off per site. Changes apply right away and are saved.</p>
+    <header>
+      <img src="../icons/icon-32.png" alt="" width="32" height="32" />
+      <div>
+        <h1>Short-Form Blocker</h1>
+        <p class="tagline">Short videos, on pause.</p>
+      </div>
+    </header>
+
+    <!-- popup.js fills in the two numbers from chrome.storage.local. -->
+    <section class="stats" aria-label="Shorts blocked">
+      <div class="stat">
+        <span class="stat-number" id="count-today">0</span>
+        <span class="stat-label">blocked today</span>
+      </div>
+      <div class="stat">
+        <span class="stat-number" id="count-all-time">0</span>
+        <span class="stat-label">all time</span>
+      </div>
+    </section>
+
+    <h2>Block on</h2>
     <!-- popup.js fills this list with one switch per site from src/settings.js. -->
     <ul id="site-list"></ul>
+    <p class="hint">Changes apply right away and are saved.</p>
 
-    <!-- Order matters: popup.js uses BlockerSettings, created by settings.js.
-         Extension pages can't run inline <script> code (Chrome's security rule),
-         so the code is always in separate files. -->
+    <!-- Order matters: popup.js uses BlockerSettings and BlockerCounter, created
+         by the two files before it. Extension pages can't run inline <script>
+         code (Chrome's security rule), so the code is always in separate files. -->
     <script src="../src/settings.js"></script>
+    <script src="../src/counter.js"></script>
     <script src="popup.js"></script>
   </body>
 </html>

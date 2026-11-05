@@ -1,21 +1,75 @@
+/* Calm and positive: soft greens, no red, no warnings. */
+:root {
+  --green: #047857;
+  --green-soft: #ecfdf5;
+  --text: #1f2937;
+  --muted: #6b7280;
+  --line: #e5e7eb;
+}
+
 /* The popup has no fixed size, so we give it a width or it shrinks to the text. */
 body {
-  width: 260px;
+  width: 280px;
   margin: 0;
   padding: 16px;
   font-family: system-ui, sans-serif;
-  color: #1f2937;
+  color: var(--text);
+}
+
+header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
 }
 
 h1 {
   font-size: 16px;
-  margin: 0 0 8px;
+  margin: 0;
 }
 
-.hint {
-  margin: 0 0 10px;
-  font-size: 13px;
-  color: #6b7280;
+.tagline {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+/* Two tiles side by side: a grid with two equal columns. */
+.stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.stat {
+  background: var(--green-soft);
+  border-radius: 10px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+}
+
+.stat-number {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--green);
+  /* Digits all the same width, so the number doesn't "wobble" as it grows. */
+  font-variant-numeric: tabular-nums;
+}
+
+.stat-label {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+h2 {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+  margin: 0 0 4px;
 }
 
 #site-list {
@@ -24,22 +78,67 @@ h1 {
   padding: 0;
 }
 
-#site-list li {
-  padding: 6px 0;
-  border-top: 1px solid #e5e7eb;
+#site-list li + li {
+  border-top: 1px solid var(--line);
 }
 
 #site-list label {
   display: flex;
   align-items: center;
-  gap: 8px;
+  justify-content: space-between;
+  padding: 9px 0;
   cursor: pointer;
   font-size: 14px;
 }
 
-/* Green checkboxes to match the calm, positive tone. */
-#site-list input {
-  accent-color: #047857;
+/*
+  A toggle switch made from a normal checkbox.
+  appearance: none removes Chrome's checkbox drawing; we draw a pill (the
+  checkbox itself) and a white knob (its ::before), then move the knob and
+  color the pill when it's :checked. It's still a real checkbox, so the
+  keyboard (Tab + Space) and screen readers keep working.
+*/
+.switch {
+  appearance: none;
+  position: relative;
+  flex-shrink: 0;
+  width: 34px;
+  height: 20px;
+  margin: 0;
+  border-radius: 999px;
+  background: #d1d5db;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.switch::before {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
   width: 16px;
   height: 16px;
+  border-radius: 50%;
+  background: white;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  transition: transform 0.15s;
+}
+
+.switch:checked {
+  background: var(--green);
+}
+
+.switch:checked::before {
+  transform: translateX(14px);
+}
+
+.switch:focus-visible {
+  outline: 2px solid var(--green);
+  outline-offset: 2px;
+}
+
+.hint {
+  margin: 10px 0 0;
+  font-size: 12px;
+  color: var(--muted);
 }

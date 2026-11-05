@@ -10,7 +10,7 @@
 
 (function () {
   const { isShortsUrl, shortsToWatchUrl } = globalThis.ShortsUrl;
-  const { start, hideLinks } = globalThis.BlockerCore;
+  const { start, hideLinks, redirectTo } = globalThis.BlockerCore;
 
   // The "card" elements YouTube wraps around one video. When a card links to a
   // Short, we hide the whole card, not just the link, so no empty box is left.
@@ -28,9 +28,8 @@
   function check() {
     const watchUrl = shortsToWatchUrl(location.href);
     if (watchUrl) {
-      // replace() instead of assigning location.href, so the Back button
-      // doesn't bounce you straight back into the Short.
-      location.replace(watchUrl);
+      // redirectTo uses location.replace(), so Back doesn't loop into the Short.
+      redirectTo(watchUrl);
       return;
     }
     // Matching links by their address instead of their text ("Shorts") works

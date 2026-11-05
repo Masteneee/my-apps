@@ -21,17 +21,51 @@
     return chrome.runtime.getURL('blocked/blocked.html');
   }
 
+  // Tells background.js that `amount` more shorts were blocked, for the
+  // "blocked today / all time" counter in the popup.
+  function reportBlocked(amount) {
+    if (amount <= 0) return;
+    try {
+      // .catch: if the extension was just reloaded, this old tab can't reach it
+      // anymore. Missing one count is fine; crashing the page script isn't.
+      chrome.runtime.sendMessage({ type: 'blocked', amount }).catch(() => {});
+    } catch {
+      // Same reason as above, for older Chrome versions that throw instead.
+    }
+  }
+
   // Hides every link that passes `isMatch`, or the box around it.
   // - linkSelector: a quick CSS pre-filter, e.g. 'a[href*="/reel/"]'
   // - isMatch: a tested function from url-logic.js that gives the real answer
   // - containerSelector: the "card" to hide; if none is found, hide the link
+  // Only boxes hidden for the FIRST time are counted, so the same Short isn't
+  // counted again every time the page changes.
   function hideLinks(linkSelector, isMatch, containerSelector) {
+    let newlyHidden = 0;
     for (const link of document.querySelectorAll(linkSelector)) {
       // link.href is always the full URL, even if the HTML says "/reel/abc".
       if (!isMatch(link.href)) continue;
       const box = (containerSelector && link.closest(containerSelector)) || link;
-      if (!box.hasAttribute(HIDDEN_ATTR)) box.setAttribute(HIDDEN_ATTR, '');
+      if (!box.hasAttribute(HIDDEN_ATTR)) {
+        box.setAttribute(HIDDEN_ATTR, '');
+        newlyHidden++;
+      }
     }
+    reportBlocked(newlyHidden);
+  }
+
+  // Leaves a short-video page (counts as one block).
+  // The page keeps running for a moment after location.replace(), and the
+  // MutationObserver can call check() again during that time. The flag makes
+  // sure we redirect, and count, only once.
+  let redirecting = false;
+  function redirectTo(url) {
+    if (redirecting) return;
+    redirecting = true;
+    reportBlocked(1);
+    // replace() instead of assigning location.href, so the Back button
+    // doesn't bounce you straight back into the short video.
+    location.replace(url);
   }
 
   // site: an ID from settings.js ("youtube", "instagram", ...)
@@ -92,5 +126,5 @@
     return { scheduleCheck };
   }
 
-  globalThis.BlockerCore = { start, hideLinks, blockedPageUrl, HIDDEN_ATTR };
+  globalThis.BlockerCore = { start, hideLinks, redirectTo, blockedPageUrl, HIDDEN_ATTR };
 })();

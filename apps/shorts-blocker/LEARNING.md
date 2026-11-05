@@ -142,3 +142,94 @@ Answers
 
 1. CSS injected by the manifest can't be switched off by JavaScript. Scoping every rule to that attribute means `blocker-core.js` can turn all the hiding on or off by adding or removing one attribute on `<html>`.
 2. The text changes with the language (and Instagram can rename the button), but the link address stays the same in every language.
+
+## Stage 3: Polish + tests (2026-11-04)
+
+### What we built
+The popup now shows two numbers, **blocked today** and **all time**, above a cleaner list of real toggle switches. Every Short card hidden for the first time counts as one, and so does every redirect (a Short opened in the normal player, TikTok replaced by the friendly page, and so on). "Today" goes back to 0 at midnight on your computer's clock. The extension has its own icon (a green square with a "paused" short-video frame) in four sizes, drawn by a small script with no library. There are 26 new tests (55 in total), including checks that `manifest.json` only points to files that exist. GitHub Actions now runs the tests automatically when you push changes to this app.
+
+### New concepts
+
+**Background service worker.** A script that belongs to the extension itself, not to any website tab (`background.js`, declared under `"background"` in the manifest). Chrome starts it when something needs it, like a message, and stops it when it's idle. We use it as the one place that saves the counter.
+
+**Messages (`chrome.runtime.sendMessage`).** Content scripts in different tabs can't talk to each other directly, but they can send a small object to the extension, like `{ type: 'blocked', amount: 3 }`. `chrome.runtime.onMessage.addListener` in `background.js` receives it. It's like dropping a note in one shared mailbox instead of everyone editing the same paper at once.
+
+**Race condition.** Saving the counter is three steps: read the number, add, write. If two tabs do it at the same moment, both read 10 and both write 11, so one block is lost. Letting only `background.js` save, one message after the other, avoids that.
+
+**Promise chain as a queue.** `saveQueue = saveQueue.then(...)` means "do this after whatever is already waiting". Each save waits for the previous one, so they can't overlap. The `.catch` keeps the queue working even if one save fails.
+
+**`chrome.storage.local` vs `sync`.** `sync` follows you to other computers but has a small limit on how often you can write. Counts change constantly, so they go in `local` (this computer only, no write limit worth worrying about). Settings, which change rarely, stay in `sync`.
+
+**Local date vs UTC.** `new Date().toISOString()` gives the date in UTC (London time, roughly). In Montreal that changes at 7 or 8 PM, so "today" would reset in the evening. `localDayKey` builds the date from `getFullYear()`, `getMonth()` and `getDate()`, which use your computer's time zone. Note that `getMonth()` counts from 0 (January is 0).
+
+**A toggle switch made from a checkbox.** `appearance: none` tells Chrome not to draw its usual box. We draw a pill shape, a white knob with `::before` (an extra box CSS can add inside an element), and move the knob when the box is `:checked`. It's still a real checkbox, so the keyboard and screen readers keep working.
+
+**What a PNG file is.** A PNG is a fixed 8-byte signature followed by "chunks": `IHDR` (width, height, color type), `IDAT` (the pixels, compressed with zlib) and `IEND`. Each chunk ends with a checksum (CRC-32) so a broken file can be detected. Node has zlib built in, which is why the icon script needs no library.
+
+**Continuous integration (GitHub Actions).** A YAML file in `.github/workflows/` tells GitHub to rent a fresh computer, install your dependencies with `npm ci`, and run `npm test` each time you push or open a pull request. `paths:` limits it to changes in this app, so editing another app doesn't run these tests. A red X on GitHub means a test failed on that commit.
+
+### Files changed
+- `src/counter.js` (new): `localDayKey`, `countsForDay`, `addBlocked`, all pure.
+- `background.js` (new): receives "blocked" messages and saves the counts one at a time.
+- `src/blocker-core.js`: `hideLinks` now counts boxes hidden for the first time; new `reportBlocked` and `redirectTo` (redirect once and count it once).
+- `sites/*.js`: use `redirectTo(...)` instead of `location.replace(...)`, so redirects are counted.
+- `popup/popup.html`, `popup/popup.css`, `popup/popup.js`: header with icon, the two counter tiles, toggle switches.
+- `icons/icon-16.png`, `icon-32.png`, `icon-48.png`, `icon-128.png` (new) and `scripts/make-icons.js` (new, the generator).
+- `manifest.json`: version 0.3.0, `icons`, `action.default_icon`, `background.service_worker`.
+- `tests/counter.test.js`, `tests/manifest.test.js` (new); `tests/url-logic.test.js`: more edge cases (lookalike hosts, relative links, bad input).
+- `.github/workflows/shorts-blocker.yml` (new, at the repo root): runs the tests on GitHub.
+- `package.json`, `package-lock.json`: version 0.3.0. No new dependency.
+- `README.md`: counter and icon hand tests, new files.
+
+### Most important lines
+```js
+const sameDay = safe.day === todayKey;
+today: sameDay ? cleanCount(safe.today) : 0,
+```
+The whole daily reset in two lines: we save the date next to today's count, and if that date isn't today, today's count is treated as 0. Nothing has to run at midnight.
+
+```js
+saveQueue = saveQueue.then(async () => { ... })
+```
+Each save is added to the end of a waiting line, so two saves never read the same old number.
+
+```js
+if (!box.hasAttribute(HIDDEN_ATTR)) {
+  box.setAttribute(HIDDEN_ATTR, '');
+  newlyHidden++;
+}
+```
+The MutationObserver re-checks the page constantly. Only counting boxes that weren't marked yet means each Short card is counted once, not once per check.
+
+### Decisions
+- **What counts as "one short blocked":** each card or link hidden for the first time, plus each redirect away from a short-video page. Sections hidden only by CSS (like the whole Shorts shelf) aren't counted, because CSS hides them without JavaScript knowing how many videos were inside. So the number is a "at least this many" count, which is fine for motivation.
+- **Opening TikTok counts as 1**, even though the whole site is blocked, because it's one "visit avoided".
+- **Turning a site off and on again doesn't recount** cards that were already hidden on that page.
+- **Counts are in `chrome.storage.local`** (see the concept above): they don't follow you to other computers.
+- **The background worker saves the counts**, not the tabs, to avoid lost counts between tabs and lost saves right before a redirect.
+- **Icon design:** "short video on pause" (a calm idea) instead of a red forbidden sign, matching the no-guilt tone. The generator script is committed (it has no dependencies), so you can change the colors and run it again.
+- **The workflow also runs when the workflow file itself changes**, so a mistake in it shows up right away.
+
+### When a site changes its layout and the blocker breaks
+Websites change their HTML often, and our rules are written for the HTML they had when we wrote them. When that happens, Shorts or Reels come back on one site. It's not a bug in your logic, just an outdated "address". Here's how to fix it yourself.
+
+1. **Find which site and what came back.** Example: the Shorts shelf is back on the YouTube home page. Only that site's two files need fixing: `sites/youtube.css` (things hidden by CSS) and `sites/youtube.js` (links and redirects).
+2. **Check it's not just a setting.** Open the popup: is the switch on? Then go to `chrome://extensions`, click reload on the extension, and refresh the tab. If the card shows an **Errors** button, read it first.
+3. **Inspect the element.** Right-click on the thing that came back and choose **Inspect**. The DevTools open on the Elements panel with that element highlighted. Move up the tree (click the lines above it) until the highlight covers the whole section you want gone. Hovering a line highlights it on the page, which helps.
+4. **Pick a stable selector.** Look at the tag name and attributes of that section. Good choices, from most to least stable: a custom tag name (`ytd-reel-shelf-renderer`), a link address (`a[href^="/shorts"]`), a meaningful attribute (`[is-shorts]`, `[role="article"]`, `[data-pagelet^="FeedUnit"]`). Avoid random-looking class names like `x1lliihq`: Facebook and Instagram generate them and change them often. Avoid visible text: it changes with the language.
+5. **Test the selector in the Console before editing files.** In the DevTools Console, type `document.querySelectorAll('your-selector-here')`. It shows how many elements match. You want exactly the section you saw, not half the page. You can try hiding them live: `document.querySelectorAll('your-selector').forEach(el => el.style.display = 'none')`.
+6. **Add it to the site's file.** In `sites/<site>.css`, add a line that starts with `html[data-shorts-blocker="on"]` (so the switch still works), followed by your selector, and keep the comma rules of the list. If it's a link or a card type, update `VIDEO_CARD_SELECTOR` or `POST_SELECTOR` in `sites/<site>.js` instead. Keep the old selector unless you're sure it's dead: some users still get the old layout.
+7. **If the address format changed** (for example Instagram Reels moving from `/reel/CODE` to something new), the fix goes in `src/url-logic.js`. Add a test for the new address in `tests/url-logic.test.js` first, run `npm test` and watch it fail, then fix the function until it passes.
+8. **Reload and check.** Reload the extension, refresh the site, check the section is gone and normal content still shows. Turn the switch off: the section must come back. Then commit with a message like "Fix YouTube Shorts shelf after layout change".
+
+### Practice exercise
+Add a third tile to the popup showing "since install" days, or simpler: make "blocked today" say "Nothing blocked yet today" when it's 0. Start with a pure function in `src/counter.js` (for example `todayMessage(count)`), write two tests for it in `tests/counter.test.js`, run `npm test`, then use it in `popup/popup.js`. Bonus: change the green in `scripts/make-icons.js`, run `node scripts/make-icons.js`, and reload the extension to see your new icon.
+
+### Quiz
+1. Why does the counter save the date (`day`) next to today's number, instead of resetting the number with a timer at midnight?
+2. Why do the tabs send a message to `background.js` instead of saving the counter themselves?
+
+Answers
+
+1. The extension isn't always running at midnight (Chrome might be closed, the background worker sleeps). Saving the date means any code that reads the counts can tell they're from another day and treat "today" as 0, whenever it runs.
+2. Two tabs saving at the same time can both read the same old number and one block gets lost (a race condition). The background worker handles messages one after another. It also keeps working when a tab is about to redirect and might close before finishing a save.

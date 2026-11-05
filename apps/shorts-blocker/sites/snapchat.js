@@ -4,11 +4,11 @@
 
 (function () {
   const { isSnapchatSpotlightUrl } = globalThis.ShortsUrl;
-  const { start, hideLinks, blockedPageUrl } = globalThis.BlockerCore;
+  const { start, hideLinks, redirectTo, blockedPageUrl } = globalThis.BlockerCore;
 
   function check() {
     if (isSnapchatSpotlightUrl(location.href)) {
-      location.replace(blockedPageUrl());
+      redirectTo(blockedPageUrl());
       return;
     }
     // No container: Snapchat's page has no stable "card" element, so we hide
