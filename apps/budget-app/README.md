@@ -1,8 +1,8 @@
 # Pocket Budget
 
-A quick, guilt-free budgeting page for young people. Log money out (Food, Transport, Fun, School, Bills, Other) and money in (Job, Gift, Other) in a few seconds, see "Money in", "Money out" and "Left this month", where the money went per category, and this month's entries newest first. Tap an entry to edit or delete it.
+A quick, guilt-free budgeting page for young people. Log money out (Food, Transport, Fun, School, Bills, Other) and money in (Job, Gift, Other) in a few seconds, see "Money in", "Money out" and "Left this month", where the money went per category (with a doughnut chart), and this month's entries newest first. Tap an entry to edit or delete it. Look back at earlier months and see each category compared with the month before ("Food: $40 less than last month"). Optionally set your hourly wage to see what each expense cost in hours of work. Export a backup file and import it back.
 
-Plain HTML, CSS and JavaScript. No build step, no packages. Data stays in your browser (localStorage), on this device only.
+Plain HTML, CSS and JavaScript. No build step, no packages. The only outside code is [Chart.js](https://www.chartjs.org/) 4.4.9, loaded from the jsDelivr CDN with a pinned version and an integrity check; without internet the page still works and shows the totals as a list. Data stays in your browser (localStorage), on this device only, until you export a backup.
 
 ## Open it
 
@@ -25,6 +25,10 @@ It prints `All tests passed (N tests)`. GitHub Actions runs the same command on 
 5. Tap an entry, **Delete this entry**, then **Keep it** (nothing happens), then delete again and **Yes, delete**.
 6. Reload the page: everything is still there.
 7. Phone check: in Chrome press F12, click the phone icon (device toolbar), pick a phone. One column, no sideways scrolling, big buttons.
+8. Chart: with internet, "Where it went" shows a doughnut whose colours match the bars in the list. Hover or tap a slice to see its amount. Then F12 > Network > Offline, reload: the chart is replaced by a short note and the list.
+9. Months: add an entry dated last month. Tap **Previous**: the title says "Looking back" and everything shows last month. **Back to this month** returns. "Compared with last month" shows lines like "Food: $40 less than last month".
+10. Hours of work: in **Settings**, type `20` and **Save wage**. A $30 expense shows "1.5 h of work", a $4 one "12 min of work". **Clear** hides them.
+11. Backup: tap **Export backup** (a `.json` file downloads). Open the page in a private window, tap **Import backup**, pick the file: all entries and the wage come back. Import it again: "No new entries to add". Try importing any other `.json` file: it's refused and nothing changes.
 
 ## Files
 

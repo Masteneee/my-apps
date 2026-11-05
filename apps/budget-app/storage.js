@@ -38,3 +38,33 @@ function saveEntries(entries) {
     return false;
   }
 }
+
+// ---------- Task 2.3: hourly wage ----------
+// Saved separately from the entries, in cents per hour (1575 = $15.75/h),
+// as a whole number like every amount in this app.
+const WAGE_KEY = 'budget-app.v1.hourlyWageCents';
+
+// Returns the saved wage in cents per hour, or null if none is set.
+function loadHourlyWageCents() {
+  try {
+    const text = localStorage.getItem(WAGE_KEY);
+    if (text === null) return null;
+    const wageCents = JSON.parse(text);
+    return isValidHourlyWage(wageCents) ? wageCents : null;
+  } catch (error) {
+    console.warn('Could not load the hourly wage:', error);
+    return null;
+  }
+}
+
+// Saves the wage (or removes it when wageCents is null). Returns true if it worked.
+function saveHourlyWageCents(wageCents) {
+  try {
+    if (wageCents === null) localStorage.removeItem(WAGE_KEY);
+    else localStorage.setItem(WAGE_KEY, JSON.stringify(wageCents));
+    return true;
+  } catch (error) {
+    console.warn('Could not save the hourly wage:', error);
+    return false;
+  }
+}

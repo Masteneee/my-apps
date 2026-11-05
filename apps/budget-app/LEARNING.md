@@ -18,6 +18,14 @@ Choices made when the task left something open (the simplest option each time):
 - **Below zero:** "Left this month" can show a negative number (it's honest), in the normal text colour with a kind sentence. If no income is logged yet, the sentence invites adding it instead.
 - **"This month" means the calendar month of today's date**, in the person's local time. Older months are kept in storage; Phase 2 adds a way to see them.
 - **Dates show as "Today", "Yesterday" or "Nov 3".** All dates in one list are from the same month, so the year isn't needed.
+- **Chart (2.1): a doughnut, and the list stays.** When Chart.js loads, the doughnut sits above the "Where it went" list; the list is always there because it has the exact amounts and its coloured bars act as the chart's legend (so Chart.js's own legend is turned off). Offline, only the list shows, with a short calm note.
+- **Chart.js version 4.4.9 from jsDelivr,** pinned to that exact version and checked with an `integrity` fingerprint. jsDelivr serves the exact files published on npm, so the fingerprint was computed from the official package.
+- **Month switcher (2.2): Previous / Next buttons**, from the month of your oldest entry to this month (or to a later month if an entry was dated in the future, so it never gets lost). A "Back to this month" link appears when looking back. After saving an entry, the page shows that entry's month.
+- **Comparison (2.2): a separate "Compared with last month" card**, one line per category that had spending in either month, plus an "All spending" line. Only facts ("$40 less than last month", "the same as last month"), all in the same calm colour. When looking back at October, it compares with September ("than in September"). If the month before had no spending, it says so instead of comparing with zero.
+- **Hours of work (2.3): under one hour shows minutes** ("12 min of work"), one hour or more shows hours with one decimal ("1.5 h of work", "2 h of work"). Tiny amounts say "under 1 min". Only money out gets it (income isn't a cost). The wage box accepts the same formats as the amount box (`15,75`, `$15.75`), up to $1,000 an hour, and a "Clear" button removes it.
+- **The wage is stored before taxes, as typed.** The app doesn't try to guess take-home pay; it's a rough "feel" for prices, not a payslip.
+- **Import adds, it never replaces (2.4).** Entries from the file are added to the ones already here, matched by id; if the same id is already here, the one here is kept. Importing the same file twice changes nothing the second time, and nothing is ever deleted, so no confirm step is needed. The wage from the file is used only if none is set here.
+- **Only our own backup files are accepted (2.4):** a JSON object with `"app": "pocket-budget"` and `"version": 1`. Anything else (broken JSON, another app's file, a bare list, a newer version) is refused with a calm message and nothing changes. Inside a good file, each entry is checked (whole positive cents up to $1,000,000, a real date, a category that exists for its type, a note of at most 80 characters) and the ones that don't fit are left out and counted. Files over 5 MB are refused before reading.
 
 ---
 
@@ -486,4 +494,290 @@ In Chrome, press F12 and click the phone icon (device toolbar). Try "iPhone SE" 
 
 1. It sets the top and bottom margin to 0 and splits the leftover horizontal space equally on the left and right, so the box is centred.
 2. On iPhone, tapping a field with text smaller than 16px zooms the page in automatically, which is annoying. 16px avoids it.
+</details>
+
+---
+
+## Task 2.1: Category chart (2026-11-05)
+
+### Plan
+- Load Chart.js 4.4.9 from the jsDelivr CDN with a plain `<script>` tag, pinned version plus an `integrity` fingerprint.
+- `logic.js`: one calm colour per category, `chartSlices` (names, cents, colours in the same order) and `chartDescription` (a sentence for screen readers), with tests.
+- `app.js`: `renderChart` creates the doughnut once, then only updates its data.
+- If `typeof Chart === 'undefined'` (no internet), hide the chart, keep the list and show a short note.
+- The list bars get the same colours as the slices, so the list is the legend.
+
+### What we built
+"Where it went" now starts with a doughnut chart: one slice per category, sized by how much went there this month. Hovering (or tapping) a slice shows its amount, like "$25.00". Each category always has the same colour, and the bars in the list below use those colours too, so you can match slice and line at a glance. The chart comes from Chart.js, a free library downloaded from the internet when the page opens. If there's no internet, the page works exactly as before: the list shows, with a small note saying the chart needs a connection. Nothing breaks and no error pops up.
+
+### New concepts
+
+**Library.** Code someone else wrote, tested and shared, so you don't write it yourself. Drawing a nice doughnut chart by hand (angles, arcs, hover detection, resizing) would take days; Chart.js does it in one `new Chart(...)` call. The trade-off: the page now depends on outside code, so we pin the version and keep the page working without it. This is the app's first dependency (allowed by the app's CLAUDE.md for phase 2).
+
+**CDN (Content Delivery Network).** A big network of servers around the world that hosts popular files (like Chart.js) and sends them from the server closest to you, fast. Instead of copying `chart.umd.js` into our folder, `<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.9/...">` tells the browser to download it from jsDelivr. jsDelivr copies files straight from npm, the place where JavaScript libraries are published. Because it's on the internet, it needs a connection the first time (browsers usually keep a copy afterwards).
+
+**Pinning a version.** `chart.js@4.4.9` means "exactly 4.4.9, forever". Writing `chart.js@4` would give you whatever 4.x is newest, which could change how the chart looks or even break it one day without you touching anything.
+
+**`integrity` (Subresource Integrity, SRI).** A fingerprint (a hash) of the exact file we expect. The browser computes the fingerprint of what the CDN sends and refuses to run it if it doesn't match. So even if the CDN were hacked, strangers' code couldn't run on your page. It needs `crossorigin="anonymous"`, which asks the CDN for the file in a way the browser is allowed to inspect.
+
+**`typeof Chart`.** When Chart.js loads, it creates a global variable called `Chart`. If the download failed, that variable doesn't exist. Writing just `Chart` would then crash with "Chart is not defined", but `typeof Chart` safely gives the text `'undefined'`. Same trick as the `typeof module` check in `logic.js`.
+
+**Canvas.** `<canvas>` is a blank drawing surface in HTML. Chart.js draws the doughnut on it pixel by pixel. A canvas is just a picture for screen readers, so we add `role="img"` and an `aria-label` with a sentence describing it.
+
+**Create once, update after.** `new Chart(...)` attaches a chart to the canvas. If we did that on every redraw, charts would pile up on the same canvas. So we keep it in `categoryChart`, and later just change `categoryChart.data` and call `categoryChart.update()`, which also animates the change.
+
+**Callbacks in settings.** `tooltip.callbacks.label` is a function we give Chart.js; it calls it whenever it shows a tooltip. We use it to turn the raw number `2500` into `$25.00`, so the chart keeps cents like the rest of the app.
+
+### Most important lines
+```html
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.9/dist/chart.umd.js"
+        integrity="sha384-4W8gMhOY..." crossorigin="anonymous"></script>
+```
+Loaded before `logic.js`, so `Chart` exists by the time `app.js` runs. If it fails, the browser just moves on to the next script.
+
+```js
+const chartLoaded = typeof Chart !== 'undefined';
+chartOffline.hidden = chartLoaded || !hasSpending;
+chartBox.hidden = !chartLoaded || !hasSpending;
+```
+The whole offline fallback: show the chart only if the library loaded and there's something to draw; show the note only if the library is missing and there's something to draw.
+
+```js
+colors: rows.map((row) => CATEGORY_COLORS[row.category] || FALLBACK_COLOR),
+```
+`.map` builds a new list with one colour per row, in the same order as the names and amounts. That "same order" is how Chart.js knows which colour goes with which slice.
+
+```css
+.chart-box { position: relative; height: 220px; }
+```
+With `maintainAspectRatio: false`, Chart.js fills its parent box. The box needs a height and `position: relative`, or the chart can grow forever.
+
+### Files changed
+- `index.html`: the Chart.js `<script>` tag, the chart box (`<canvas>`) and the offline note in "Where it went".
+- `logic.js`: `CATEGORY_COLORS`, `chartSlices`, `chartDescription`.
+- `app.js`: `renderChart` (create once, update after, offline fallback); list bars use the category colour.
+- `style.css`: `.chart-box`, `.chart-offline`.
+- `tests.js`: 4 tests (every category has a colour, slices line up, empty and unknown category, description sentence).
+
+### Try it yourself
+Change `type: 'doughnut'` to `type: 'pie'` in `app.js` and reload. Then try `'bar'` (you'll notice a bar chart wants different settings, like no `cutout`). Put `'doughnut'` back. Bonus: open F12, Network, tick "Offline", reload, and see the fallback.
+
+### Quiz
+1. Why do we check `typeof Chart !== 'undefined'` instead of `if (Chart)`?
+2. What would happen if the CDN sent a different file than the one we pinned?
+
+<details><summary>Answers</summary>
+
+1. If Chart.js didn't load, the variable `Chart` doesn't exist, and `if (Chart)` would crash with "Chart is not defined", stopping the rest of `app.js`. `typeof` never crashes: it just gives `'undefined'`.
+2. The fingerprint in `integrity` wouldn't match, so the browser would refuse to run it. `Chart` would stay undefined and the page would show the list, like when offline.
+</details>
+
+---
+
+## Task 2.2: Month switcher (2026-11-05)
+
+### Plan
+- One `viewedMonth` variable in `app.js` decides which month the whole page shows (summary, chart, list, entries).
+- `logic.js`: `shiftMonth` (move by N months), `monthRange` and `clampMonth` (how far the buttons can go), with tests.
+- `logic.js`: `compareCategories` (both months side by side per category), `comparisonText` ("$40 less than last month"), `previousMonthName`, `formatCentsShort`, with tests.
+- `index.html`: Previous / Next buttons, a "Back to this month" link, and a "Compared with last month" card.
+- After saving, jump to the saved entry's month so you always see it.
+
+### What we built
+The top card now has "Previous" and "Next" buttons. Press Previous to look at October: the totals, the chart, "Where it went" and the list of entries all switch to October, and the title says "Looking back". A "Back to this month" link brings you home. The buttons fade out when there's nothing further to see. A new card, "Compared with last month", says for each category how this month compares with the one before, like "Food: $40 less than last month", with "All spending" on top. The sentences are plain facts in calm colours: no red, no "over budget", no judging.
+
+### New concepts
+
+**One piece of state drives the whole page.** `viewedMonth` holds a text like `"2026-10"`. Every button just changes that one variable and calls `render()`, which redraws everything for that month. That's the same "redraw it all from the data" idea from task 1.2: the buttons don't need to know about the list, the chart or the totals.
+
+**Month keys as text.** `"2026-09" < "2026-11"` is true when comparing text, because both have the same shape (4-digit year, dash, 2-digit month) and text is compared character by character. That's why we always pad months to 2 digits: `"2026-9"` would sort after `"2026-11"`.
+
+**Date overflow to move months.** `new Date(2026, -1, 1)` means "month -1 of 2026", which JavaScript turns into December 2025. So `shiftMonth` never needs special cases for January or December: the `Date` does the carrying, like carrying a 1 in addition.
+
+**`disabled`.** A button with `disabled = true` ignores clicks and taps, and the CSS `button:disabled` rule fades it. Better than a button that does nothing when you press it.
+
+**`Set`.** A list that keeps each value only once. `new Set([...Object.keys(now), ...Object.keys(before)])` gives every category from both months, with no duplicates (Food appears once even if both months had Food). `[...set]` turns it back into a normal array.
+
+**Neutral wording on purpose.** The app's job is to show what happened, not to judge it. "$12.50 more than last month" is information; "Overspent!" in red is guilt. Same colour for "more" and "less".
+
+### Most important lines
+```js
+function shiftMonth(key, delta) {
+  const date = new Date(year, monthIndex + delta, 1);
+  return date.getFullYear() + '-' + twoDigits(date.getMonth() + 1);
+}
+```
+Day 1 on purpose: moving "January 31" by one month would land on "March 3" (February has no 31st). The 1st exists in every month.
+
+```js
+viewedMonth = clampMonth(viewedMonth, range);
+```
+At the start of `render()`. If you delete the only entry of an old month, that month leaves the range, and this pulls the view back inside it.
+
+```js
+return { category, cents, previousCents, diffCents: cents - previousCents };
+```
+`diffCents` below zero means you spent less this month. `comparisonText` turns it into words with `Math.abs` (the size of the difference, without the minus sign).
+
+### Files changed
+- `index.html`: Previous / Next buttons, "Back to this month", `left-label`, the "Compared with" card.
+- `logic.js`: `shiftMonth`, `monthRange`, `clampMonth`, `previousMonthName`, `formatCentsShort`, `compareCategories`, `comparisonText`.
+- `app.js`: `viewedMonth`, `renderMonthSwitcher`, `renderComparison`, `makeCompareRow`, `showMonth`; summary, totals and list now show the viewed month with matching wording.
+- `style.css`: switcher, disabled buttons, comparison rows.
+- `tests.js`: 8 tests (month shifting across years, range, clamp, names, short money, comparison with new and missing categories, sentences).
+
+### Try it yourself
+Add a line under each comparison row showing both amounts, like "$60 now, $100 in October". Everything you need is already in each row (`row.cents`, `row.previousCents`) and `formatCentsShort`.
+
+### Quiz
+1. Why does `shiftMonth` use day 1 instead of today's day?
+2. What does `comparisonText(-4000, 'last month')` return, and where does the minus sign go?
+
+<details><summary>Answers</summary>
+
+1. Not every month has every day. Moving the 31st into February would overflow into March. Every month has a day 1, so moving the 1st is always safe.
+2. `'$40 less than last month'`. The minus sign decides the word ("less" instead of "more"), then `Math.abs(-4000)` gives `4000` for the amount, which `formatCentsShort` shows as `$40`.
+</details>
+
+---
+
+## Task 2.3: Hours of work (2026-11-05)
+
+### Plan
+- `logic.js`: `isValidHourlyWage` and `workTimeText(amountCents, wageCents)` ("12 min", "1.5 h"), integer math only, with tests.
+- `storage.js`: `loadHourlyWageCents` / `saveHourlyWageCents`, the wage stored in cents per hour under its own key.
+- `index.html`: a "Settings" card with an optional "Hourly wage" box, Save and Clear.
+- `app.js`: each expense in the list gets a small "1.5 h of work" line when a wage is set.
+
+### What we built
+A "Settings" card at the bottom where you can type your pay per hour, like `15.75`. Once saved, every expense in the list shows how long you'd have to work to pay for it: a $30 dinner at $20 an hour shows "1.5 h of work", a $4 bus ticket "12 min of work". It's a way to feel what things cost without any judgement. The wage is saved in this browser, in cents per hour (1575), like every other amount. "Clear" removes it and the lines disappear. Leaving it empty changes nothing.
+
+### New concepts
+
+**Settings vs data.** Entries are your history; a setting is a preference that changes how the history is shown. We store the wage under its own localStorage key (`budget-app.v1.hourlyWageCents`), so it can be changed or cleared without touching the entries.
+
+**Cents per hour.** $15.75 an hour is stored as `1575`. The same rule as amounts: whole numbers only, so no `0.1 + 0.2` surprises. We even reuse `parseAmountToCents` to read the box.
+
+**Integer math for a ratio.** Hours = amount / wage. `3000 / 2000 = 1.5` is fine, but many divisions give long decimals (`10000 / 1575 = 6.349206...`). We want one decimal, so we compute tenths of an hour: `Math.round(10000 * 10 / 1575) = 63`, then split it into `6` and `3` and write "6.3". No decimal number is ever stored or added up.
+
+**Integer division and remainder.** `Math.floor(63 / 10)` gives `6` (how many whole tens) and `63 % 10` gives `3` (what's left). `%` is the "remainder" operator, the same one used in `formatCents` to get the cents.
+
+**`localStorage.removeItem`.** Deletes one key completely. Used by "Clear", so "no wage" is truly nothing, not a `0` that could be mistaken for a wage.
+
+**Checking again when loading.** `loadHourlyWageCents` runs `isValidHourlyWage` on what it reads. If someone edited localStorage by hand to `"hello"` or `-5`, the app treats it as "no wage" instead of showing "NaN h of work".
+
+### Most important lines
+```js
+const minutes = Math.round((amountCents * 60) / wageCents);
+if (minutes < 60) return minutes + ' min';
+```
+Cents divided by cents per hour gives hours; times 60 gives minutes. Multiply first, then divide, then round, so the answer is a whole number.
+
+```js
+const tenths = Math.round((amountCents * 10) / wageCents); // 15 means 1.5 h
+return wholeHours.toLocaleString('en-US') + (tenth === 0 ? '' : '.' + tenth) + ' h';
+```
+`(condition ? a : b)` is a short if/else: when the tenth is 0 we write "2 h" instead of "2.0 h".
+
+```js
+const workText = entry.type === 'expense' ? workTimeText(entry.amountCents, hourlyWageCents) : '';
+```
+Only money out gets a work time, and `workTimeText` returns `''` when no wage is set, so one check (`workText !== ''`) covers both cases.
+
+### Files changed
+- `index.html`: the "Settings" card (wage box, Save, Clear).
+- `logic.js`: `MAX_HOURLY_WAGE_CENTS`, `isValidHourlyWage`, `workTimeText`.
+- `storage.js`: `loadHourlyWageCents`, `saveHourlyWageCents`.
+- `app.js`: `hourlyWageCents`, `renderWage`, `setWage`, the wage form listeners, the "of work" line in the list.
+- `style.css`: `.entry-work`, `.hint`.
+- `tests.js`: 4 tests (valid wages, hours with one decimal, minutes for small amounts, no wage).
+
+### Try it yourself
+Show the hours of work for the whole month next to "Money out" (for example "$34.00, about 1.7 h of work"). You only need `app.js`: `workTimeText(totals.outCents, hourlyWageCents)` in `renderSummary`.
+
+### Quiz
+1. With a wage of $16 an hour, what does a $4 expense show, and how is it computed?
+2. Why does the wage use its own localStorage key instead of being saved inside the entries list?
+
+<details><summary>Answers</summary>
+
+1. "15 min of work". `Math.round(400 * 60 / 1600) = 15` minutes, which is under 60, so it's shown in minutes.
+2. It's a setting, not an entry. Keeping it separate means `isValidEntry` and the totals never have to skip a strange "wage" item, and clearing the wage can't touch your history.
+</details>
+
+---
+
+## Task 2.4: Export and import (2026-11-05)
+
+### Plan
+- `logic.js`: `buildBackup` (the file's content), `backupFileName`, `parseBackup` (checks a file and never throws), `cleanImportedEntry`, `isRealDate`, `mergeEntries` (adds, never deletes), `importSummary`, all tested.
+- `app.js`: "Export backup" turns the data into a JSON file and downloads it; "Import backup" opens a file picker, reads the file and asks `logic.js` what to do.
+- `index.html`: a "Backup" card with both buttons, a hidden file input and a message line.
+- Checked in Chromium: export, then import into a fresh browser, gives back exactly the same entries and wage.
+
+### What we built
+A "Backup" card at the bottom. "Export backup" downloads a file like `pocket-budget-backup-2026-11-05.json` with all your entries (every month) and your hourly wage. If the browser is ever cleared, or you switch to a new phone or laptop, "Import backup" loads that file back. Importing adds the entries from the file to what's already here and never deletes anything, so it's always safe to try. If you pick the wrong file (a photo, another app's file, a broken file), it calmly says it isn't a Pocket Budget backup and changes nothing. If a few entries inside a backup look wrong, it keeps the good ones and tells you how many were left out.
+
+### New concepts
+
+**Export and import.** Export = copy your data out of the app into a file you own. Import = read such a file back in. localStorage can be erased by "clear browsing data", so a file is your safety net.
+
+**JSON file.** The same JSON text we already save in localStorage, written into a file. `JSON.stringify(backup, null, 2)` adds line breaks and 2-space indents, so you can open the file in any text editor and read it. Amounts stay whole cents (`1250`), so nothing gets rounded on the way out or in.
+
+**Blob and object URL.** A `Blob` is a chunk of data in the page's memory (here: our text). `URL.createObjectURL(blob)` gives it a temporary address like `blob:null/3f2a...`. A link `<a href="that address" download="name.json">`, clicked by code, makes the browser save it as a file. `URL.revokeObjectURL` frees the memory afterwards. No server needed, so it works from `file://`.
+
+**File input.** `<input type="file">` opens the system's file picker. We hide it (it looks different in every browser) and our nice button calls `importFile.click()` to open it. When a file is chosen, it fires a `change` event, and `importFile.files[0]` is the chosen file.
+
+**`async` / `await`.** Reading a file takes a moment. `file.text()` gives a Promise: "I'll have the text soon". `await file.text()` waits for it without freezing the page; it's only allowed inside a function marked `async`. If reading fails, the error lands in our `try / catch`, like a normal error.
+
+**Never trust a file.** A file can come from anywhere: another app, a hand-edited backup, a mistake. So `parseBackup` checks everything: is it valid JSON, is it our app (`"app": "pocket-budget"`), is it a version we understand, is `entries` a list, and then each entry one by one. It returns an answer instead of throwing, so the page can always show a calm message.
+
+**Copy only what you know.** `cleanImportedEntry` builds a brand-new object with exactly our 7 fields. Any extra field in the file (`isAdmin: true`, a giant blob of text) is simply not copied. That's safer than spreading the whole object with `...raw`.
+
+**A version number in the file.** `"version": 1` is a promise about the file's shape. If a future Pocket Budget changes the shape, it will write `"version": 2`, and this version knows to refuse it instead of misreading it.
+
+**Merging by id.** Every entry has a unique id. `mergeEntries` puts the ids already here in a `Set`, then keeps only the file's entries whose id isn't in it. That's why importing twice doesn't double your entries.
+
+### Most important lines
+```js
+const url = URL.createObjectURL(blob);
+link.href = url;
+link.download = backupFileName(todayISO());
+link.click();
+```
+The whole download: give the data an address, point a link at it, tell the browser to save rather than open it (`download`), and click it from code.
+
+```js
+const isObject = typeof data === 'object' && data !== null && !Array.isArray(data);
+if (!isObject || data.app !== BACKUP_APP) { return { ok: false, message: ... }; }
+```
+`typeof null` and `typeof []` are both `'object'` in JavaScript (a famous oddity), so we rule them out by hand before reading `data.app`.
+
+```js
+if (!isRealDate(raw.date)) return null;
+```
+`"2026-02-30"` passes the shape check, but `new Date` would quietly turn it into March 2. `isRealDate` sends the date through `addDays(date, 0)` and checks that the same text comes back.
+
+```js
+const newOnes = importedEntries.filter((entry) => !idsHere.has(entry.id));
+```
+Keep only entries we don't already have. Checking a `Set` is instant, even with thousands of ids.
+
+### Files changed
+- `index.html`: "Backup" card (Export backup, Import backup, hidden file input, message).
+- `logic.js`: `BACKUP_APP`, `BACKUP_VERSION`, `MAX_BACKUP_BYTES`, `buildBackup`, `backupFileName`, `isRealDate`, `cleanImportedEntry`, `parseBackup`, `mergeEntries`, `importSummary`.
+- `app.js`: `handleExport`, `handleImportFile` and their listeners.
+- `tests.js`: 10 tests (file content, export-then-import round trip, broken and foreign files, versions, bad entries counted, extra fields dropped, bad wage ignored, real dates, merging, messages).
+
+### Try it yourself
+Export a backup, open the `.json` file in a text editor, and change one `amountCents` to `12.5`. Import it into the app (in a private window, so it starts empty). Read the message: which entry was left out, and which test in `tests.js` checks exactly that?
+
+### Quiz
+1. Why does importing a backup twice not give you every entry twice?
+2. Why do we check `Array.isArray(data)` when `typeof data === 'object'` already passed?
+
+<details><summary>Answers</summary>
+
+1. `mergeEntries` matches entries by id. The second time, every id from the file is already here, so nothing is added ("No new entries to add. 3 were already here.").
+2. In JavaScript, `typeof []` is `'object'` too. A bare list isn't our backup format (it has no `app` or `version`), so we refuse it explicitly.
 </details>

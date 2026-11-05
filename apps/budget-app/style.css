@@ -393,3 +393,70 @@ ul {
     padding: 20px 24px;
   }
 }
+
+/* ---------- 2.1 Chart ----------
+   Chart.js needs a box with a fixed height and position: relative, and the
+   canvas alone inside it, to size itself correctly (see LEARNING 2.1). */
+.chart-box {
+  position: relative;
+  height: 220px;
+  margin-bottom: 12px;
+}
+
+.chart-offline {
+  margin: 0 0 8px;
+}
+
+/* ---------- 2.2 Month switcher and comparison ---------- */
+
+/* Two equal buttons side by side: < Previous | Next > */
+.month-switcher {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+/* A disabled button is faded, and the cursor shows it can't be clicked. */
+button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+#back-to-today {
+  margin: -4px 0 6px;
+}
+
+.compare-row {
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.compare-row:last-child {
+  border-bottom: 0;
+}
+
+.compare-name {
+  font-weight: 600;
+}
+
+/* "All spending" stands out a little, still in calm colours. */
+.compare-total {
+  padding: 10px 12px;
+  margin-bottom: 4px;
+  border-radius: 10px;
+  border-bottom: 0;
+  background: var(--accent-soft);
+}
+
+/* ---------- 2.3 Hours of work ---------- */
+
+.entry-work {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.hint {
+  margin: -2px 0 8px;
+  font-size: 0.9rem;
+}

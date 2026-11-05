@@ -44,3 +44,4 @@ Things only I (Amasten) can do: accounts, API keys, deploying, and choices the p
 - [ ] **wellbeing-app (phone install):** on the HTTPS Vercel URL, install it (Chrome ⋮ > Install app / Safari Share > Add to Home Screen), turn on airplane mode, open it and do a check-in.
 - [ ] **wellbeing-app (Stage 5):** with Supabase connected, check in a few days, open `/insights`, then Profile > Your data > Download JSON and CSV. Log in as a second account and check its export has none of the first account's days.
 - [ ] **wellbeing-app (privacy):** decide how people ask you to delete their account (e.g. add a contact email to `app/privacy/page.tsx` and `PRIVACY.md`). Delete = Supabase > Authentication > Users > Delete user.
+- [ ] **budget-app:** with internet, open `apps/budget-app/index.html` and check the doughnut chart appears (the Chart.js CDN was blocked during the build; offline it shows a list instead).

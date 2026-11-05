@@ -36,7 +36,7 @@ Done: shorts-blocker (3/3), wondered-site (4/4), media-log (7/7, not deployed), 
 Group small tasks: one subagent per phase is fine for phases 0 to 2.
 - [x] Phase 0: Setup (0.1)
 - [x] Phase 1: Log money (1.1 to 1.6)
-- [ ] Phase 2: See it (2.1 to 2.4)
+- [x] Phase 2: See it (2.1 to 2.4)
 - [ ] Phase 3: Goals without guilt (3.1 to 3.5)
 - [ ] Phase 4: Learn investing (starts with 4.0, which needs my choice)
 

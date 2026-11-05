@@ -17,7 +17,14 @@
   <main>
     <!-- Task 0.1 / 1.4: the month summary at the top. -->
     <section id="this-month" class="card" aria-labelledby="month-title">
-      <h2 id="month-title">This month <span id="month-label" class="muted"></span></h2>
+      <h2 id="month-title"><span id="month-heading">This month</span> <span id="month-label" class="muted"></span></h2>
+      <!-- Task 2.2: move between months. app.js disables Previous/Next at the
+           first and last month that has entries. -->
+      <div class="month-switcher" role="group" aria-label="Choose a month">
+        <button type="button" id="prev-month" class="secondary-button">&lsaquo; Previous</button>
+        <button type="button" id="next-month" class="secondary-button">Next &rsaquo;</button>
+      </div>
+      <button type="button" id="back-to-today" class="quiet-button" hidden>Back to this month</button>
       <div class="summary">
         <div class="summary-item">
           <span class="summary-label">Money in</span>
@@ -28,7 +35,7 @@
           <span id="total-out" class="summary-value">$0.00</span>
         </div>
         <div class="summary-item summary-left">
-          <span class="summary-label">Left this month</span>
+          <span id="left-label" class="summary-label">Left this month</span>
           <span id="total-left" class="summary-value">$0.00</span>
         </div>
       </div>
@@ -89,8 +96,22 @@
     <!-- Task 1.5: totals per category. -->
     <section class="card" aria-labelledby="categories-title">
       <h2 id="categories-title">Where it went</h2>
+      <!-- Task 2.1: the doughnut chart. Only shown when Chart.js loaded from the
+           CDN and something was spent. The list below always stays: it has the
+           exact amounts, and its coloured bars work as the chart's legend. -->
+      <div id="chart-box" class="chart-box" hidden>
+        <canvas id="category-chart" role="img" aria-label="Spending by category"></canvas>
+      </div>
+      <p id="chart-offline" class="muted small chart-offline" hidden>The chart needs an internet connection. Here are the same totals as a list.</p>
       <ul id="category-totals" class="category-totals"></ul>
       <p id="categories-empty" class="empty-message">Nothing spent yet this month.</p>
+    </section>
+
+    <!-- Task 2.2: each category compared with the month before. -->
+    <section class="card" aria-labelledby="compare-title">
+      <h2 id="compare-title">Compared with last month</h2>
+      <ul id="compare-list" class="compare-list"></ul>
+      <p id="compare-empty" class="empty-message"></p>
     </section>
 
     <!-- Task 1.2: this month's entries, newest first. -->
@@ -100,7 +121,47 @@
       <ul id="entry-list" class="entry-list"></ul>
       <p id="list-empty" class="empty-message">Nothing logged yet this month. Your first entry takes about 5 seconds.</p>
     </section>
+
+    <!-- Task 2.3: settings. The wage is optional; without it nothing changes. -->
+    <section class="card" aria-labelledby="settings-title">
+      <h2 id="settings-title">Settings</h2>
+      <form id="wage-form" novalidate>
+        <label for="wage" class="field-label">Hourly wage <span class="muted">(optional)</span></label>
+        <p class="muted hint">Each expense then shows how many hours of work it cost. It stays on this device.</p>
+        <input id="wage" type="text" inputmode="decimal" autocomplete="off" placeholder="e.g. 15.75">
+        <p id="wage-message" class="form-message" role="status" aria-live="polite"></p>
+        <div class="form-actions">
+          <button type="submit" class="primary-button">Save wage</button>
+          <button type="button" id="clear-wage" class="secondary-button">Clear</button>
+        </div>
+      </form>
+    </section>
+
+    <!-- Task 2.4: export and import, so clearing the browser never loses data. -->
+    <section class="card" aria-labelledby="backup-title">
+      <h2 id="backup-title">Backup</h2>
+      <p class="muted hint">Your data lives only in this browser. Export a backup now and then, and keep the file somewhere safe. Importing a backup adds its entries; it never deletes yours.</p>
+      <div class="form-actions">
+        <button type="button" id="export-button" class="primary-button">Export backup</button>
+        <button type="button" id="import-button" class="secondary-button">Import backup</button>
+      </div>
+      <!-- The real file picker is hidden (it looks different in every browser);
+           the "Import backup" button opens it. -->
+      <input type="file" id="import-file" accept=".json,application/json" hidden>
+      <p id="backup-message" class="form-message" role="status" aria-live="polite"></p>
+    </section>
   </main>
+
+  <!-- Task 2.1: Chart.js, a library someone else wrote, loaded from a CDN
+       (jsDelivr). The exact version (4.4.9) is pinned so it can never change
+       under our feet. "integrity" is a fingerprint of that exact file: if the
+       CDN ever sent different code, the browser would refuse to run it.
+       "crossorigin" is needed for that check on a file from another website.
+       If there's no internet, this script simply fails and the page still works:
+       app.js checks typeof Chart and shows the list without the chart. -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.9/dist/chart.umd.js"
+          integrity="sha384-4W8gMhOYqk0FPg9sAMkb3g/P2fXtzbUyDUUgMlA1EEig8z/U/13EYUjErc1H382b"
+          crossorigin="anonymous"></script>
 
   <!-- Plain scripts, loaded in this order (no modules, so it works from file://).
        logic.js first because storage.js and app.js use its functions. -->

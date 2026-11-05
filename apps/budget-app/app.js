@@ -21,16 +21,35 @@ const deleteConfirm = document.getElementById('delete-confirm');
 const confirmDeleteButton = document.getElementById('confirm-delete');
 const keepEntryButton = document.getElementById('keep-entry');
 
+const monthHeading = document.getElementById('month-heading');
 const monthLabelText = document.getElementById('month-label');
+const prevMonthButton = document.getElementById('prev-month');
+const nextMonthButton = document.getElementById('next-month');
+const backToTodayButton = document.getElementById('back-to-today');
+const leftLabel = document.getElementById('left-label');
+const compareTitle = document.getElementById('compare-title');
+const compareList = document.getElementById('compare-list');
+const compareEmpty = document.getElementById('compare-empty');
 const totalInText = document.getElementById('total-in');
 const totalOutText = document.getElementById('total-out');
 const totalLeftText = document.getElementById('total-left');
 const leftNote = document.getElementById('left-note');
 const categoryTotalsList = document.getElementById('category-totals');
 const categoriesEmpty = document.getElementById('categories-empty');
+const chartBox = document.getElementById('chart-box');
+const chartCanvas = document.getElementById('category-chart');
+const chartOffline = document.getElementById('chart-offline');
 const entryList = document.getElementById('entry-list');
 const listEmpty = document.getElementById('list-empty');
 const listHint = document.getElementById('list-hint');
+const wageForm = document.getElementById('wage-form');
+const wageInput = document.getElementById('wage');
+const wageMessage = document.getElementById('wage-message');
+const clearWageButton = document.getElementById('clear-wage');
+const exportButton = document.getElementById('export-button');
+const importButton = document.getElementById('import-button');
+const importFile = document.getElementById('import-file');
+const backupMessage = document.getElementById('backup-message');
 
 // ---------- State: what the app remembers while the page is open ----------
 let entries = loadEntries(); // every entry ever saved (all months)
@@ -38,6 +57,9 @@ let currentType = 'expense'; // which toggle is on: 'expense' or 'income'
 let selectedCategory = null; // the category button that's pressed, or null
 let editingId = null; // id of the entry being edited, or null when adding
 let messageTimer = null; // used to clear the "Saved" message after a moment
+let categoryChart = null; // the Chart.js chart, created the first time it's needed
+let viewedMonth = monthKey(todayISO()); // the month on screen, like "2026-11" (task 2.2)
+let hourlyWageCents = loadHourlyWageCents(); // cents per hour, or null if not set (task 2.3)
 
 // A unique-enough id for a new entry: the time in base 36 plus random letters.
 function makeId() {
@@ -102,19 +124,37 @@ function resetForm() {
 
 function render() {
   const today = todayISO();
-  const thisMonth = entriesInMonth(entries, monthKey(today));
+  const todayKey = monthKey(today);
+  const range = monthRange(entries, todayKey);
+  viewedMonth = clampMonth(viewedMonth, range);
+  const isThisMonth = viewedMonth === todayKey;
 
-  renderSummary(thisMonth, today);
-  renderCategoryTotals(thisMonth);
-  renderEntryList(thisMonth, today);
+  const monthEntries = entriesInMonth(entries, viewedMonth);
+  const previousEntries = entriesInMonth(entries, shiftMonth(viewedMonth, -1));
+
+  renderMonthSwitcher(range, isThisMonth);
+  renderSummary(monthEntries, isThisMonth);
+  renderCategoryTotals(monthEntries, isThisMonth);
+  renderComparison(monthEntries, previousEntries, todayKey);
+  renderEntryList(monthEntries, today, isThisMonth);
 }
 
-function renderSummary(thisMonth, today) {
-  const totals = monthTotals(thisMonth);
-  monthLabelText.textContent = monthLabel(monthKey(today));
+// Task 2.2: the month name, and which switcher buttons make sense right now.
+function renderMonthSwitcher(range, isThisMonth) {
+  monthHeading.textContent = isThisMonth ? 'This month' : 'Looking back';
+  monthLabelText.textContent = monthLabel(viewedMonth);
+  // "disabled" greys out a button and makes it ignore clicks.
+  prevMonthButton.disabled = viewedMonth <= range.first;
+  nextMonthButton.disabled = viewedMonth >= range.last;
+  backToTodayButton.hidden = isThisMonth;
+}
+
+function renderSummary(monthEntries, isThisMonth) {
+  const totals = monthTotals(monthEntries);
   totalInText.textContent = formatCents(totals.inCents);
   totalOutText.textContent = formatCents(totals.outCents);
   totalLeftText.textContent = formatCents(totals.leftCents);
+  leftLabel.textContent = isThisMonth ? 'Left this month' : 'Left that month';
 
   // Below zero is shown calmly, in the same colour, with a kind note.
   // If no income is logged yet, "left" is negative only because it's missing,
@@ -123,17 +163,21 @@ function renderSummary(thisMonth, today) {
     leftNote.textContent = 'Add your money in (job pay, gifts) with the "Money in" button to see what\'s left.';
     leftNote.hidden = false;
   } else if (totals.leftCents < 0) {
-    leftNote.textContent = 'A bit more went out than came in this month. That happens, and seeing it is the first step.';
+    leftNote.textContent = 'A bit more went out than came in ' + (isThisMonth ? 'this' : 'that') +
+      ' month. That happens, and seeing it is the first step.';
     leftNote.hidden = false;
   } else {
     leftNote.hidden = true;
   }
 }
 
-function renderCategoryTotals(thisMonth) {
-  const rows = totalsByCategory(thisMonth);
+function renderCategoryTotals(monthEntries, isThisMonth) {
+  const rows = totalsByCategory(monthEntries);
   categoryTotalsList.innerHTML = '';
   categoriesEmpty.hidden = rows.length > 0;
+  categoriesEmpty.textContent = isThisMonth
+    ? 'Nothing spent yet this month.'
+    : 'Nothing spent in ' + monthLabel(viewedMonth) + '.';
 
   for (const row of rows) {
     const item = document.createElement('li');
@@ -147,21 +191,117 @@ function renderCategoryTotals(thisMonth) {
     amount.textContent = formatCents(row.cents);
 
     // A thin bar whose width is this category's share of all spending.
+    // Same colour as its slice in the chart, so the list doubles as the legend.
     const bar = document.createElement('span');
     bar.className = 'category-bar';
     bar.style.width = row.percent + '%';
+    bar.style.background = CATEGORY_COLORS[row.category] || '';
     bar.setAttribute('aria-hidden', 'true'); // decoration only
 
     item.append(name, amount, bar);
     categoryTotalsList.appendChild(item);
   }
+
+  renderChart(rows);
 }
 
-function renderEntryList(thisMonth, today) {
-  const sorted = sortNewestFirst(thisMonth);
+// Task 2.1: the doughnut chart. Chart.js comes from a CDN, so it may be missing
+// (no internet). typeof Chart is 'undefined' then, and we keep only the list.
+function renderChart(rows) {
+  const chartLoaded = typeof Chart !== 'undefined';
+  const hasSpending = rows.length > 0;
+  chartOffline.hidden = chartLoaded || !hasSpending;
+  chartBox.hidden = !chartLoaded || !hasSpending;
+  if (chartBox.hidden) return;
+
+  const slices = chartSlices(rows);
+  chartCanvas.setAttribute('aria-label', chartDescription(rows));
+
+  try {
+    if (categoryChart === null) {
+      // First time: create the chart. "new Chart(where, settings)".
+      categoryChart = new Chart(chartCanvas, {
+        type: 'doughnut',
+        data: {
+          labels: slices.labels,
+          datasets: [{ data: slices.cents, backgroundColor: slices.colors, borderColor: '#ffffff', borderWidth: 2 }],
+        },
+        options: {
+          responsive: true, // follow the width of #chart-box
+          maintainAspectRatio: false, // use the height from style.css
+          cutout: '60%', // size of the hole in the middle
+          plugins: {
+            legend: { display: false }, // the list below is the legend
+            tooltip: {
+              // The data is in cents, so show it as money: 2500 -> "$25.00".
+              callbacks: { label: (context) => ' ' + formatCents(context.parsed) },
+            },
+          },
+        },
+      });
+    } else {
+      // Later: change the data of the same chart and ask it to redraw.
+      // Creating a new chart every time would stack them on one canvas.
+      categoryChart.data.labels = slices.labels;
+      categoryChart.data.datasets[0].data = slices.cents;
+      categoryChart.data.datasets[0].backgroundColor = slices.colors;
+      categoryChart.update();
+    }
+  } catch (error) {
+    // If the library misbehaves, the list still has everything.
+    console.warn('Could not draw the chart:', error);
+    chartBox.hidden = true;
+  }
+}
+
+// Task 2.2: "Food: $40 less than last month", one line per category.
+function renderComparison(monthEntries, previousEntries, todayKey) {
+  const otherMonthName = previousMonthName(viewedMonth, todayKey);
+  const rows = compareCategories(monthEntries, previousEntries);
+  const previousOut = monthTotals(previousEntries).outCents;
+
+  // "in September" -> "Compared with September"
+  compareTitle.textContent = 'Compared with ' + otherMonthName.replace(/^in /, '');
+  compareList.innerHTML = '';
+
+  // Nothing spent the month before: there's nothing fair to compare with.
+  if (previousOut === 0) {
+    compareEmpty.textContent = 'Nothing was spent ' + otherMonthName + ', so there\'s nothing to compare with.';
+    compareEmpty.hidden = false;
+    return;
+  }
+  compareEmpty.hidden = true;
+
+  // First line: all spending together.
+  const totalDiff = monthTotals(monthEntries).outCents - previousOut;
+  compareList.appendChild(makeCompareRow('All spending', comparisonText(totalDiff, otherMonthName), true));
+
+  for (const row of rows) {
+    const name = (CATEGORY_ICONS[row.category] || '') + ' ' + row.category;
+    compareList.appendChild(makeCompareRow(name, comparisonText(row.diffCents, otherMonthName), false));
+  }
+}
+
+function makeCompareRow(name, text, isTotal) {
+  const item = document.createElement('li');
+  item.className = 'compare-row' + (isTotal ? ' compare-total' : '');
+  const nameSpan = document.createElement('span');
+  nameSpan.className = 'compare-name';
+  nameSpan.textContent = name + ':';
+  const textSpan = document.createElement('span');
+  textSpan.textContent = text;
+  item.append(nameSpan, ' ', textSpan);
+  return item;
+}
+
+function renderEntryList(monthEntries, today, isThisMonth) {
+  const sorted = sortNewestFirst(monthEntries);
   entryList.innerHTML = '';
   listEmpty.hidden = sorted.length > 0;
   listHint.hidden = sorted.length === 0;
+  listEmpty.textContent = isThisMonth
+    ? 'Nothing logged yet this month. Your first entry takes about 5 seconds.'
+    : 'Nothing logged in ' + monthLabel(viewedMonth) + '.';
 
   for (const entry of sorted) {
     const item = document.createElement('li');
@@ -191,6 +331,14 @@ function renderEntryList(thisMonth, today) {
       // instead of being run as HTML.
       note.textContent = entry.note;
       middle.appendChild(note);
+    }
+    // Task 2.3: "1.5 h of work", only for money out and only if a wage is set.
+    const workText = entry.type === 'expense' ? workTimeText(entry.amountCents, hourlyWageCents) : '';
+    if (workText !== '') {
+      const work = document.createElement('span');
+      work.className = 'entry-work';
+      work.textContent = workText + ' of work';
+      middle.appendChild(work);
     }
 
     const right = document.createElement('span');
@@ -255,7 +403,10 @@ function handleSubmit(event) {
   }
 
   // Reset first (this clears editingId), then save and redraw once.
+  // Show the month the entry belongs to, so you always see what you just saved
+  // (even if you were looking at another month, or changed its date).
   resetForm();
+  viewedMonth = monthKey(fields.date);
   const ok = commit(newEntries);
   showMessage(ok ? message : 'Added for now, but this browser would not save it. It may be in private mode.');
 }
@@ -335,6 +486,123 @@ keepEntryButton.addEventListener('click', () => {
 
 confirmDeleteButton.addEventListener('click', handleDeleteConfirmed);
 
+// Task 2.2: month switcher. Change which month is on screen, then redraw.
+// If you were editing an entry, stop: it may not be in the new month's list.
+function showMonth(key) {
+  if (editingId !== null) resetForm();
+  viewedMonth = key;
+  render();
+}
+
+prevMonthButton.addEventListener('click', () => showMonth(shiftMonth(viewedMonth, -1)));
+nextMonthButton.addEventListener('click', () => showMonth(shiftMonth(viewedMonth, 1)));
+backToTodayButton.addEventListener('click', () => showMonth(monthKey(todayISO())));
+
+// ---------- Task 2.3: hourly wage setting ----------
+
+// Shows the saved wage in the box ("15.75"), or an empty box if none.
+function renderWage() {
+  wageInput.value = hourlyWageCents === null ? '' : centsToInputValue(hourlyWageCents);
+  clearWageButton.hidden = hourlyWageCents === null;
+}
+
+function setWage(newWageCents, message) {
+  hourlyWageCents = newWageCents;
+  const ok = saveHourlyWageCents(newWageCents);
+  renderWage();
+  render(); // the entry list shows (or hides) the hours of work
+  wageMessage.textContent = ok ? message : 'Changed for now, but this browser would not save it.';
+}
+
+wageForm.addEventListener('submit', (event) => {
+  event.preventDefault();
+  // Same parser as the amount box, so "15,75" and "$15.75" both work.
+  const wageCents = parseAmountToCents(wageInput.value);
+  if (!isValidHourlyWage(wageCents)) {
+    wageMessage.textContent = 'Type your pay per hour, like 15.75 (up to $1,000).';
+    wageInput.focus();
+    return;
+  }
+  setWage(wageCents, 'Saved: ' + formatCents(wageCents) + ' an hour.');
+});
+
+clearWageButton.addEventListener('click', () => setWage(null, 'Wage cleared. Hours of work are hidden.'));
+
+// ---------- Task 2.4: export and import ----------
+
+// Builds the backup as text and makes the browser download it as a file.
+function handleExport() {
+  const backup = buildBackup(entries, hourlyWageCents, new Date().toISOString());
+  // null, 2 = indent with 2 spaces, so the file is readable in a text editor.
+  const text = JSON.stringify(backup, null, 2);
+
+  // A Blob is a chunk of data in memory. createObjectURL gives it a temporary
+  // address, and a link with "download" saves whatever it points to as a file.
+  const blob = new Blob([text], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = backupFileName(todayISO());
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  // Free the memory once the download has started.
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+
+  backupMessage.textContent = 'Backup exported (' + entries.length +
+    (entries.length === 1 ? ' entry' : ' entries') + '). Keep the file somewhere safe, like your cloud drive.';
+}
+
+// Runs when a file was picked. "async" lets us "await" reading the file,
+// which takes a moment, without freezing the page.
+async function handleImportFile() {
+  const file = importFile.files[0];
+  // Empty the picker, so choosing the same file again still counts as a change.
+  importFile.value = '';
+  if (!file) return; // the person closed the picker without choosing
+
+  if (file.size > MAX_BACKUP_BYTES) {
+    backupMessage.textContent = 'This file is too big to be a Pocket Budget backup. Nothing was changed.';
+    return;
+  }
+
+  let text;
+  try {
+    text = await file.text();
+  } catch (error) {
+    backupMessage.textContent = 'This file couldn\'t be opened. Nothing was changed.';
+    return;
+  }
+
+  // All the checking happens in logic.js (tested). Here we only act on the answer.
+  const result = parseBackup(text);
+  if (!result.ok) {
+    backupMessage.textContent = result.message;
+    return;
+  }
+
+  const merged = mergeEntries(entries, result.entries);
+
+  // Restore the wage only if none is set here: like entries, what's here wins.
+  let wageRestored = false;
+  if (hourlyWageCents === null && result.hourlyWageCents !== null) {
+    hourlyWageCents = result.hourlyWageCents;
+    saveHourlyWageCents(hourlyWageCents);
+    renderWage();
+    wageRestored = true;
+  }
+
+  const ok = commit(merged.entries);
+  backupMessage.textContent = ok
+    ? importSummary(merged.addedCount, merged.alreadyHereCount, result.skippedCount, wageRestored)
+    : 'Loaded for now, but this browser would not save it. It may be in private mode.';
+}
+
+exportButton.addEventListener('click', handleExport);
+importButton.addEventListener('click', () => importFile.click()); // opens the file picker
+importFile.addEventListener('change', handleImportFile);
+
 // ---------- Start ----------
 resetForm();
+renderWage();
 render();
