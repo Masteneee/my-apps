@@ -1,0 +1,13 @@
+/* Loads Tailwind. Every class like "bg-zinc-950" or "px-4" comes from here. */
+@import "tailwindcss";
+
+/* The app is dark-only for now. color-scheme tells the browser to draw its own
+   parts (scrollbars, form fields, autofill) in dark colours too. */
+:root {
+  color-scheme: dark;
+}
+
+body {
+  /* System fonts: fast (nothing to download) and look native on every device. */
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}

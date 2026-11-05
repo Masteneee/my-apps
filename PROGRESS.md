@@ -17,7 +17,7 @@ Done: shorts-blocker (3/3), wondered-site (4/4). Next: media-log Stage 1. Then w
 - [x] Stage 4: Ship it
 
 ## 3. media-log (flagship)
-- [ ] Stage 1: Skeleton + accounts
+- [x] Stage 1: Skeleton + accounts
 - [ ] Stage 2: Database + movies
 - [ ] Stage 3: Unified search
 - [ ] Stage 4: Tracking + diary

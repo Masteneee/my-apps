@@ -1,0 +1,16 @@
+# Installed packages (recreate with `npm install`)
+node_modules/
+
+# Next.js build output (recreate with `npm run build`)
+.next/
+out/
+next-env.d.ts
+*.tsbuildinfo
+
+# Secrets: never commit these. Copy .env.example to .env.local instead.
+.env
+.env.local
+.env*.local
+
+.DS_Store
+npm-debug.log*
