@@ -105,3 +105,106 @@ Read the error, fix it, and check that `/category/math/` now lists your question
 Answers
 1. The schema in `src/content.config.ts` says `title` is a required string, and Astro checks every file against it at build time.
 2. It returns the list of every page to build (one per question file), with each page's slug and data.
+
+## Stage 2: Discovery (2026-11-04)
+
+### What we built
+A search page, a "Random question" button, "related questions" at the bottom of each question page,
+and a cleaner design with a dark mode toggle. Search is done by Pagefind, which reads the finished HTML
+after `astro build` and makes a small search index that runs entirely in the visitor's browser, so we
+still need no server. The random button and related questions use two small pure functions in
+`src/lib/discovery.ts`, which have 6 new Vitest tests. Titles are bigger and bolder, body text is larger
+with more line spacing, and every colour has a dark version.
+
+### New concepts
+
+**Static search (Pagefind).** A normal search box sends your words to a server that looks them up.
+Pagefind instead builds the index ahead of time, splits it into small files in `dist/pagefind/`, and the
+browser downloads only the pieces it needs for what you type. The `data-pagefind-body` attribute marks
+which part of a page to index; we put it around the title and short answer only. Because the index is
+made from `dist/`, search only works after a build (`npm run build` then `npm run preview`).
+
+**Chaining commands with `&&`.** Our build script is `astro build && pagefind --site dist`. The `&&`
+means "run the second command only if the first one succeeded", so Pagefind never indexes a broken build.
+
+**Custom elements.** `<random-question>` is an HTML tag we invented. `customElements.define(...)` tells
+the browser "when you see this tag, run this class". Its `connectedCallback` runs when the tag appears on
+the page, which is where we attach the click handler. Pagefind's `<pagefind-input>` and
+`<pagefind-results>` work the same way.
+
+**Passing build-time data to the browser.** Astro code runs at build time, but the click happens later
+in the browser. We bridge the gap by writing the list of slugs into an HTML attribute
+(`data-slugs="[...]"`) and reading it back with `this.dataset.slugs` in the browser.
+
+**Dark mode with a class.** Tailwind's `dark:` classes (like `dark:bg-slate-950`) normally follow the
+system setting. One line in `global.css` (`@custom-variant dark ...`) makes them follow a `dark` class on
+`<html>` instead, so a button can switch it. The button calls `classList.toggle('dark')`.
+
+**localStorage and try/catch.** localStorage is a tiny key/value store in the browser that survives page
+reloads. In private browsing or with strict settings it can throw an error, so every read and write is
+inside `try { ... } catch { ... }`: if it fails, the toggle still works, it just isn't remembered.
+
+**Avoiding the white flash.** If dark mode were applied by a normal script, the page would first draw in
+light colours and then switch. A tiny `<script is:inline>` in `<head>` runs before anything is drawn,
+reads the saved choice (or the system preference) and adds the `dark` class right away.
+
+**Injecting randomness for tests.** `Math.random()` gives a different number each time, which makes tests
+unpredictable. `pickRandomSlug` takes the random function as a parameter: the browser passes
+`Math.random`, the tests pass `() => 0` or `() => 0.999` and know exactly what to expect.
+
+### New dependency (and why)
+- `pagefind` (dev only): builds the search index and ships the ready-made search box. Writing our own
+  search (index, ranking, highlighting) would be a lot of work for the same result.
+
+### Files and what each one does
+- `package.json` build script now runs Pagefind after Astro; `pagefind` added.
+- `src/lib/discovery.ts` `relatedQuestions` (same category, not itself, newest first, max 3) and `pickRandomSlug`.
+- `src/lib/discovery.test.ts` 6 tests for those two functions.
+- `src/lib/theme.ts` `savedTheme` / `saveTheme`, the try/catch-wrapped localStorage helpers.
+- `src/components/ThemeToggle.astro` the Dark/Light button.
+- `src/components/RandomButton.astro` the Random question button.
+- `src/pages/search.astro` the search page using Pagefind's Component UI.
+- `src/layouts/Base.astro` header buttons, the no-flash theme script, dark colours.
+- `src/pages/questions/[slug].astro` bigger title, `data-pagefind-body`, related questions section.
+- `src/components/QuestionList.astro`, `src/pages/index.astro`, `src/pages/category/[category].astro` new typography and dark colours.
+- `src/styles/global.css` class-based dark mode, font stack, Pagefind colour tweaks.
+
+### Most important lines
+```ts
+.filter((q) => q.data.category === current.data.category && q.id !== current.id)
+```
+Keep a question only if it's in the same category AND isn't the page we're on. Without the second
+check, every page would list itself as "related".
+
+```ts
+return choices[Math.floor(random() * choices.length)];
+```
+`random()` gives a number from 0 up to (but not including) 1. Multiplying by the length and rounding
+down gives a whole number from 0 to length - 1, which is always a valid index.
+
+```html
+<div data-pagefind-body> ... title and short answer ... </div>
+```
+This attribute is the whole Pagefind setup on our side: once any page has it, Pagefind indexes only
+those blocks and skips pages without it (home, categories, search).
+
+### Decisions
+- Search covers titles and short answers only (as PLAN.md says), not the full explanation.
+- Used Pagefind's newer "Component UI" (recommended since Pagefind 1.5) instead of the older Default UI.
+- Related questions: same category only, newest first, at most 3. If there are none yet (right now every
+  sample is in a different category) the section is hidden instead of showing an empty box.
+- With no saved theme, the site follows the system's light/dark setting.
+- No web font download: a system font stack keeps pages fast.
+
+### Practice exercise
+Change the related questions limit from 3 to 2: find where `relatedQuestions` is called and pass `2`.
+Then add a second physics question (copy `why-is-the-sky-blue.mdx`, change the title and slug),
+run `npm run build` and `npm run preview`, and check that each physics page now lists the other one.
+
+### Quiz
+1. Why does search work in `npm run preview` but not in `npm run dev`?
+2. Why does `pickRandomSlug` take `random` as a parameter instead of calling `Math.random()` directly?
+
+Answers
+1. Pagefind builds the search index from `dist/` as the last step of `npm run build`; the dev server never runs Pagefind, so `/pagefind/` doesn't exist there.
+2. So tests can pass a fake random function with a known result and check the exact answer, while the browser passes the real `Math.random`.

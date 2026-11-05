@@ -1,5 +1,5 @@
 ---
-// Reusable list of question cards, used by the home page and category pages.
+// Reusable list of question cards, used by the home page, category pages and "related questions".
 import type { CollectionEntry } from 'astro:content';
 
 interface Props {
@@ -9,10 +9,10 @@ const { questions } = Astro.props;
 ---
 <ul class="space-y-4">
   {questions.map((q) => (
-    <li class="rounded-lg border border-slate-200 p-4 hover:border-slate-400">
+    <li class="rounded-xl border border-slate-200 p-5 transition hover:border-indigo-400 hover:shadow-sm dark:border-slate-800 dark:hover:border-indigo-400">
       <a href={`/questions/${q.id}/`} class="block">
-        <h2 class="text-xl font-semibold">{q.data.title}</h2>
-        <p class="mt-1 text-slate-600">{q.data.short_answer}</p>
+        <h2 class="text-xl font-bold tracking-tight sm:text-2xl">{q.data.title}</h2>
+        <p class="mt-2 leading-relaxed text-slate-600 dark:text-slate-400">{q.data.short_answer}</p>
       </a>
     </li>
   ))}

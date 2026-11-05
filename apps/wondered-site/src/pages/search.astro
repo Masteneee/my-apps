@@ -1,0 +1,32 @@
+---
+// Search page. Pagefind reads the built HTML in dist/ after `astro build`, makes a search index,
+// and puts its ready-made search components in dist/pagefind/. So search only works
+// after `npm run build` (try it with `npm run preview`), not with `npm run dev`.
+import Base from '../layouts/Base.astro';
+---
+<Base title="Search">
+  <h1 class="mb-6 text-4xl font-extrabold tracking-tight sm:text-5xl">Search</h1>
+  <p class="mb-6 text-slate-600 dark:text-slate-400">Searches question titles and short answers.</p>
+
+  <!-- Pagefind's "Component UI": custom HTML tags that its script brings to life.
+       They find each other on the page, so the input feeds the results automatically. -->
+  <pagefind-input autofocus></pagefind-input>
+  <div class="mt-4"><pagefind-summary></pagefind-summary></div>
+  <div class="mt-4"><pagefind-results></pagefind-results></div>
+
+  <p id="search-missing" hidden class="mt-6 text-slate-600 dark:text-slate-400">
+    The search index is made by Pagefind during <code>npm run build</code>. Run <code>npm run build</code>
+    then <code>npm run preview</code> to try search.
+  </p>
+  <noscript><p class="text-slate-600 dark:text-slate-400">Search needs JavaScript turned on.</p></noscript>
+
+  <link href="/pagefind/pagefind-component-ui.css" rel="stylesheet" />
+  <!-- is:inline: this file doesn't exist until Pagefind runs, so Astro must not try to bundle it.
+       onerror shows the help text in dev mode, where the file is missing. -->
+  <script
+    is:inline
+    type="module"
+    src="/pagefind/pagefind-component-ui.js"
+    onerror="document.getElementById('search-missing').hidden = false"
+  ></script>
+</Base>

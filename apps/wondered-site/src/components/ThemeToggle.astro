@@ -1,0 +1,25 @@
+---
+// Button that switches light/dark and remembers the choice.
+// (The very first theme is applied by a tiny inline script in Base.astro, before the page paints.)
+---
+<button
+  id="theme-toggle"
+  type="button"
+  class="rounded-full border border-slate-300 px-3 py-1 text-sm hover:bg-slate-100 dark:border-slate-600 dark:hover:bg-slate-800"
+  aria-label="Toggle dark mode"
+>
+  <span class="dark:hidden">Dark</span><span class="hidden dark:inline">Light</span>
+</button>
+
+<script>
+  import { saveTheme } from '../lib/theme';
+
+  const button = document.getElementById('theme-toggle');
+  button?.addEventListener('click', () => {
+    // classList.toggle returns true if the class is now on.
+    const isDark = document.documentElement.classList.toggle('dark');
+    // Pagefind's search components look for this attribute instead of our class.
+    document.documentElement.dataset.pfTheme = isDark ? 'dark' : 'light';
+    saveTheme(isDark ? 'dark' : 'light');
+  });
+</script>

@@ -4,7 +4,7 @@
   "description": "Have You Ever Wondered: short STEM answers",
   "scripts": {
     "dev": "astro dev",
-    "build": "astro build",
+    "build": "astro build && pagefind --site dist",
     "preview": "astro preview",
     "check": "astro check",
     "test": "vitest run"
@@ -17,6 +17,7 @@
   },
   "devDependencies": {
     "@astrojs/check": "^0.9.12",
+    "pagefind": "^1.6.0",
     "typescript": "^6.0.3",
     "vitest": "^5.1.0"
   },

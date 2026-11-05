@@ -13,8 +13,8 @@ const category = Astro.params.category as Category;
 const questions = sortNewestFirst(inCategory(await getCollection('questions'), category));
 ---
 <Base title={categoryLabel(category)}>
-  <h1 class="mb-6 text-3xl font-bold">{categoryLabel(category)}</h1>
+  <h1 class="mb-8 text-4xl font-extrabold tracking-tight sm:text-5xl">{categoryLabel(category)}</h1>
   {questions.length > 0
     ? <QuestionList questions={questions} />
-    : <p class="text-slate-600">No questions here yet. More coming soon!</p>}
+    : <p class="text-slate-600 dark:text-slate-400">No questions here yet. More coming soon!</p>}
 </Base>

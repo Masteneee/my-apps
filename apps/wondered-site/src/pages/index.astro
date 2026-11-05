@@ -8,12 +8,12 @@ import { CATEGORIES, categoryLabel, sortNewestFirst } from '../lib/categories';
 const questions = sortNewestFirst(await getCollection('questions'));
 ---
 <Base title="Home">
-  <h1 class="mb-2 text-3xl font-bold">Have you ever wondered...?</h1>
-  <p class="mb-6 text-slate-600">Short, well-explained answers, STEM first.</p>
+  <h1 class="mb-3 text-4xl font-extrabold tracking-tight text-balance sm:text-6xl">Have you ever wondered...?</h1>
+  <p class="mb-8 text-lg text-slate-600 dark:text-slate-400">Short, well-explained answers, STEM first.</p>
 
   <section class="mb-8 flex flex-wrap gap-2">
     {CATEGORIES.map((c) => (
-      <a href={`/category/${c}/`} class="rounded-full border border-slate-300 px-3 py-1 text-sm hover:bg-slate-100">
+      <a href={`/category/${c}/`} class="rounded-full border border-slate-300 px-3 py-1 text-sm hover:bg-slate-100 dark:border-slate-600 dark:hover:bg-slate-800">
         {categoryLabel(c)}
       </a>
     ))}

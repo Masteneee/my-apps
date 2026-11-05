@@ -1,1 +1,33 @@
 @import "tailwindcss";
+
+/* Tailwind's dark: classes normally follow the system setting.
+   This line makes them follow a "dark" class on <html> instead, so our toggle can control it. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  /* A readable system font stack: no font download, so pages stay fast. */
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+html {
+  /* Lets the browser draw scrollbars and form controls in the right colours too. */
+  color-scheme: light;
+}
+html.dark {
+  color-scheme: dark;
+}
+
+/* Pagefind's search components read these CSS variables for their colours.
+   Pagefind has its own dark palette (switched on by data-pf-theme="dark" on <html>);
+   here we only nudge a few colours so search matches the rest of the site.
+   "html.dark" is more specific than Pagefind's ":root", so ours win. */
+html {
+  --pf-font: var(--font-sans);
+  --pf-border-focus: #4f46e5;
+}
+html.dark {
+  --pf-background: #0f172a;
+  --pf-border: #334155;
+  --pf-hover: #1e293b;
+  --pf-border-focus: #a5b4fc;
+}

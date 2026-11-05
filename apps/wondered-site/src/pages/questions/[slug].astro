@@ -2,7 +2,9 @@
 // The square brackets make this a dynamic route: one template, many pages.
 import { getCollection, render } from 'astro:content';
 import Base from '../../layouts/Base.astro';
+import QuestionList from '../../components/QuestionList.astro';
 import { categoryLabel } from '../../lib/categories';
+import { relatedQuestions } from '../../lib/discovery';
 
 // For a static site, Astro must know every URL at build time.
 // We return one entry per .mdx file, so a new file = a new page automatically.
@@ -10,36 +12,49 @@ export async function getStaticPaths() {
   const questions = await getCollection('questions');
   return questions.map((question) => ({
     params: { slug: question.id },
-    props: { question },
+    props: { question, related: relatedQuestions(questions, question) },
   }));
 }
 
-const { question } = Astro.props;
+const { question, related } = Astro.props;
 const { title, category, short_answer, sources, date } = question.data;
 // render() turns the MDX body into a component we can place on the page.
 const { Content } = await render(question);
 ---
 <Base title={title}>
   <article>
-    <a href={`/category/${category}/`} class="text-sm uppercase tracking-wide text-slate-500 hover:underline">
+    <a href={`/category/${category}/`} class="text-sm font-semibold uppercase tracking-widest text-indigo-600 hover:underline dark:text-indigo-300">
       {categoryLabel(category)}
     </a>
-    <h1 class="mt-1 text-4xl font-bold">{title}</h1>
-    <p class="mt-4 rounded-lg bg-slate-100 p-4 text-lg"><strong>Short answer:</strong> {short_answer}</p>
+    <!-- data-pagefind-body: Pagefind only indexes what's inside this block,
+         so search covers the title and short answer, not the long explanation. -->
+    <div data-pagefind-body>
+      <h1 class="mt-2 text-4xl font-extrabold leading-tight tracking-tight text-balance sm:text-5xl">{title}</h1>
+      <p class="mt-6 rounded-xl border-l-4 border-indigo-500 bg-slate-100 p-5 text-lg leading-relaxed dark:bg-slate-900">
+        <strong data-pagefind-ignore>Short answer:</strong> {short_answer}
+      </p>
+    </div>
 
     <!-- Tailwind removes default heading/list styles, so we restyle MDX output here. -->
-    <div class="mt-6 space-y-4 leading-relaxed [&_h2]:mt-8 [&_h2]:text-2xl [&_h2]:font-semibold [&_ul]:list-disc [&_ul]:pl-6">
+    <div class="mt-8 space-y-5 text-lg leading-8 text-slate-800 dark:text-slate-300 [&_h2]:mt-10 [&_h2]:text-2xl [&_h2]:font-bold [&_h2]:tracking-tight [&_h2]:text-slate-900 dark:[&_h2]:text-slate-100 [&_ul]:list-disc [&_ul]:pl-6 [&_a]:text-indigo-600 dark:[&_a]:text-indigo-300 [&_a]:underline">
       <Content />
     </div>
 
-    <section class="mt-10 border-t border-slate-200 pt-4">
-      <h2 class="text-lg font-semibold">Sources</h2>
+    <section class="mt-12 border-t border-slate-200 pt-6 dark:border-slate-800">
+      <h2 class="text-lg font-bold">Sources</h2>
       <ul class="mt-2 list-disc pl-6 text-sm">
         {sources.map((url) => (
-          <li><a href={url} class="break-all text-blue-700 hover:underline" rel="noopener">{url}</a></li>
+          <li><a href={url} class="break-all text-indigo-700 hover:underline dark:text-indigo-300" rel="noopener">{url}</a></li>
         ))}
       </ul>
-      <p class="mt-4 text-xs text-slate-500">Published {date.toISOString().slice(0, 10)}</p>
+      <p class="mt-4 text-xs text-slate-500 dark:text-slate-400">Published {date.toISOString().slice(0, 10)}</p>
     </section>
+
+    {related.length > 0 && (
+      <section class="mt-12">
+        <h2 class="mb-4 text-2xl font-bold tracking-tight">More {categoryLabel(category).toLowerCase()} questions</h2>
+        <QuestionList questions={related} />
+      </section>
+    )}
   </article>
 </Base>

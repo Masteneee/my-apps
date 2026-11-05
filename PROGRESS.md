@@ -12,7 +12,7 @@ Not started.
 
 ## 2. wondered-site ("Have you ever wondered")
 - [x] Stage 1: Skeleton + content system
-- [ ] Stage 2: Discovery
+- [x] Stage 2: Discovery
 - [ ] Stage 3: Video + interactivity
 - [ ] Stage 4: Ship it
 

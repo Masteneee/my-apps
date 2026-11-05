@@ -1,0 +1,34 @@
+---
+// "Random question" button. The list of slugs is baked into the HTML at build time,
+// so picking one in the browser needs no server and no extra request.
+import { getCollection } from 'astro:content';
+
+const slugs = (await getCollection('questions')).map((q) => q.id);
+---
+<random-question data-slugs={JSON.stringify(slugs)}>
+  <button
+    type="button"
+    class="rounded-full bg-indigo-600 px-3 py-1 text-sm font-medium text-white hover:bg-indigo-500 dark:bg-indigo-400 dark:text-slate-950 dark:hover:bg-indigo-300"
+  >
+    Random question
+  </button>
+</random-question>
+
+<script>
+  import { pickRandomSlug } from '../lib/discovery';
+
+  // A tiny custom element: the browser runs connectedCallback for each <random-question> on the page.
+  class RandomQuestion extends HTMLElement {
+    connectedCallback() {
+      const slugs: string[] = JSON.parse(this.dataset.slugs ?? '[]');
+      // On /questions/why-is-the-sky-blue/ this gives "why-is-the-sky-blue"; elsewhere null.
+      const match = location.pathname.match(/^\/questions\/([^/]+)\/?$/);
+      const current = match ? match[1] : null;
+      this.querySelector('button')?.addEventListener('click', () => {
+        const slug = pickRandomSlug(slugs, current);
+        if (slug) location.href = `/questions/${slug}/`;
+      });
+    }
+  }
+  customElements.define('random-question', RandomQuestion);
+</script>
