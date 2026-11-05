@@ -1,0 +1,14 @@
+/*
+  Injected into instagram.com. Only active while the Instagram switch is on
+  (src/blocker-core.js puts data-shorts-blocker="on" on <html>).
+  We match link addresses, not the word "Reels", so it works in any language.
+*/
+
+/* Things sites/instagram.js marked as Reels. */
+html[data-shorts-blocker="on"] [data-shorts-blocker-hidden],
+
+/* "Reels" button in the side/bottom menu ("/reels/") and the Reels tab on
+   profiles ("/username/reels/"). Both addresses end in "/reels/". */
+html[data-shorts-blocker="on"] a[href$="/reels/"] {
+  display: none !important;
+}

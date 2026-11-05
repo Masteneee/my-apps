@@ -1,0 +1,46 @@
+/*
+  Injected into youtube.com by manifest.json.
+  CSS applies instantly, even before JavaScript runs, so known Shorts sections
+  never flash on screen. ":has(...)" means "an element that contains ...".
+
+  Every rule starts with html[data-shorts-blocker="on"]: src/blocker-core.js
+  removes that attribute when you switch YouTube off in the popup, and then
+  none of these rules match anymore.
+
+  Language: we match tag names and link addresses ("/shorts"), not visible
+  text, so this works with YouTube in French or any other language. The few
+  rules that still use a label ("Shorts") are backups: YouTube keeps the brand
+  name "Shorts" untranslated, including in French.
+
+  If YouTube changes its layout and Shorts reappear, right-click the Short,
+  choose Inspect, and update the tag names below.
+*/
+
+/* Cards marked by sites/youtube.js because they link to a Short. */
+html[data-shorts-blocker="on"] [data-shorts-blocker-hidden],
+
+/* Shorts shelf on the home page and subscriptions. */
+html[data-shorts-blocker="on"] ytd-rich-shelf-renderer[is-shorts],
+html[data-shorts-blocker="on"] ytd-rich-section-renderer:has(ytd-rich-shelf-renderer[is-shorts]),
+html[data-shorts-blocker="on"] ytd-rich-section-renderer:has(ytm-shorts-lockup-view-model),
+
+/* Shorts shelf in search results and next to a video. */
+html[data-shorts-blocker="on"] ytd-reel-shelf-renderer,
+html[data-shorts-blocker="on"] grid-shelf-view-model:has(ytm-shorts-lockup-view-model),
+
+/* "Shorts" link in the left sidebar (big and collapsed versions).
+   The href rules work in any language; the title/aria-label rules are backups. */
+html[data-shorts-blocker="on"] ytd-guide-entry-renderer:has(a[href^="/shorts"]),
+html[data-shorts-blocker="on"] ytd-mini-guide-entry-renderer:has(a[href^="/shorts"]),
+html[data-shorts-blocker="on"] ytd-guide-entry-renderer:has(a[title="Shorts" i]),
+html[data-shorts-blocker="on"] ytd-mini-guide-entry-renderer[aria-label="Shorts" i],
+
+/* "Shorts" tab on channel pages: by its link to ".../shorts" first, label as backup. */
+html[data-shorts-blocker="on"] yt-tab-shape:has(a[href$="/shorts"]),
+html[data-shorts-blocker="on"] yt-tab-shape[tab-title="Shorts" i],
+
+/* m.youtube.com: Shorts shelf and the Shorts button in the bottom bar. */
+html[data-shorts-blocker="on"] ytm-reel-shelf-renderer,
+html[data-shorts-blocker="on"] ytm-pivot-bar-item-renderer:has(.pivot-shorts) {
+  display: none !important;
+}

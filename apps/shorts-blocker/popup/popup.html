@@ -7,8 +7,14 @@
   </head>
   <body>
     <h1>Short-Form Blocker</h1>
-    <p class="status">Active on <strong>YouTube</strong></p>
-    <p class="hint">Shorts are hidden and Shorts links open in the normal player.</p>
-    <!-- Stage 2 adds on/off switches per site here. -->
+    <p class="hint">Switch blocking on or off per site. Changes apply right away and are saved.</p>
+    <!-- popup.js fills this list with one switch per site from src/settings.js. -->
+    <ul id="site-list"></ul>
+
+    <!-- Order matters: popup.js uses BlockerSettings, created by settings.js.
+         Extension pages can't run inline <script> code (Chrome's security rule),
+         so the code is always in separate files. -->
+    <script src="../src/settings.js"></script>
+    <script src="popup.js"></script>
   </body>
 </html>

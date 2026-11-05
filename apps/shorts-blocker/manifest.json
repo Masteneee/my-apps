@@ -1,8 +1,9 @@
 {
   "manifest_version": 3,
   "name": "Short-Form Blocker",
-  "version": "0.1.0",
-  "description": "Hides YouTube Shorts and redirects Shorts links to the normal video player.",
+  "version": "0.2.0",
+  "description": "Hides YouTube Shorts, Instagram Reels, Facebook Reels and Snapchat Spotlight, and blocks TikTok. One switch per site.",
+  "permissions": ["storage"],
   "action": {
     "default_title": "Short-Form Blocker",
     "default_popup": "popup/popup.html"
@@ -10,9 +11,39 @@
   "content_scripts": [
     {
       "matches": ["https://www.youtube.com/*", "https://m.youtube.com/*"],
-      "js": ["src/url-logic.js", "src/youtube.js"],
-      "css": ["src/youtube.css"],
+      "js": ["src/url-logic.js", "src/settings.js", "src/blocker-core.js", "sites/youtube.js"],
+      "css": ["sites/youtube.css"],
       "run_at": "document_start"
+    },
+    {
+      "matches": ["https://www.instagram.com/*"],
+      "js": ["src/url-logic.js", "src/settings.js", "src/blocker-core.js", "sites/instagram.js"],
+      "css": ["sites/instagram.css"],
+      "run_at": "document_start"
+    },
+    {
+      "matches": ["https://*.tiktok.com/*"],
+      "js": ["src/settings.js", "src/blocker-core.js", "sites/tiktok.js"],
+      "css": ["sites/tiktok.css"],
+      "run_at": "document_start"
+    },
+    {
+      "matches": ["https://*.facebook.com/*"],
+      "js": ["src/url-logic.js", "src/settings.js", "src/blocker-core.js", "sites/facebook.js"],
+      "css": ["sites/facebook.css"],
+      "run_at": "document_start"
+    },
+    {
+      "matches": ["https://www.snapchat.com/*"],
+      "js": ["src/url-logic.js", "src/settings.js", "src/blocker-core.js", "sites/snapchat.js"],
+      "css": ["sites/snapchat.css"],
+      "run_at": "document_start"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["blocked/blocked.html", "blocked/blocked.css"],
+      "matches": ["https://*.tiktok.com/*", "https://*.facebook.com/*", "https://www.snapchat.com/*"]
     }
   ]
 }

@@ -65,3 +65,80 @@ Answers
 
 1. YouTube adds new content as you scroll and when you navigate without a full reload, so new Shorts would appear after the first check. The MutationObserver re-checks on every change.
 2. Chrome runs the files in the listed order. `youtube.js` reads `globalThis.ShortsUrl`, which only exists after `url-logic.js` has run.
+
+## Stage 2: Other sites + settings (2026-11-04)
+
+### What we built
+The blocker now works on five sites, and the popup has one on/off switch per site. Instagram loses its Reels button and Reels posts, and a Reel link opens as a normal post. TikTok is replaced by a friendly "Nothing to swipe here." page. Facebook Reels and Snapchat Spotlight are hidden from the feed and their pages show that same friendly page. Your switches are saved with `chrome.storage.sync`, so they survive a restart, and they apply instantly to tabs that are already open. YouTube now also works when it's displayed in French. The new URL and settings logic has 18 new tests (29 in total).
+
+### New concepts
+
+**`chrome.storage.sync`.** A small key/value storage that Chrome gives extensions. Unlike a normal variable, it's still there after you close Chrome, and if you're signed into Chrome with sync on, it follows you to your other computers. It's asynchronous: `chrome.storage.sync.get(key, callback)` doesn't return the answer, it calls your function later with it. That's why our code "assumes on" for a split second until the answer arrives.
+
+**Permissions.** Extensions must declare in `manifest.json` which Chrome features they use. `"permissions": ["storage"]` is what unlocks `chrome.storage`. Asking only for what you need is good practice: users (and the Chrome Web Store) are suspicious of extensions that ask for a lot.
+
+**Events across tabs (`chrome.storage.onChanged`).** When the popup saves a setting, Chrome tells every content script that is listening, in every open tab. Our scripts react by adding or removing one attribute on `<html>`, so a switch works immediately without reloading.
+
+**One attribute to switch all the CSS.** Content-script CSS from the manifest can't be turned off by JavaScript. So every rule starts with `html[data-shorts-blocker="on"]`: "only when `<html>` has this attribute". Removing that single attribute makes all the rules stop matching at once.
+
+**Sharing code between sites (a small "engine").** All five sites need the same plumbing: read the switch, listen for changes, watch the page. Instead of copying it five times, it lives once in `src/blocker-core.js`, and each `sites/*.js` file only says what is special about its site (a `check` function). If Facebook changes its layout, you only open `sites/facebook.js` and `sites/facebook.css`.
+
+**`web_accessible_resources`.** Files inside an extension are private by default: a website tab can't open them. Listing `blocked/blocked.html` there (only for TikTok, Facebook and Snapchat) lets those tabs navigate to our friendly page with `chrome.runtime.getURL(...)`, which turns a file path into its full `chrome-extension://...` address.
+
+**Language-independent selectors.** Matching the visible word "Shorts" breaks when the page is in another language. Matching what doesn't get translated is safer: tag names (`ytd-reel-shelf-renderer`), and link addresses (`a[href^="/shorts"]`, `a[href$="/reels/"]`). `^=` means "starts with", `$=` "ends with", `*=` "contains", and an `i` before `]` makes the comparison ignore upper/lower case.
+
+**Defaults and "cleaning" saved data.** The first time the extension runs, storage is empty, and if we add a sixth site later, old saved settings won't mention it. `withDefaults` handles both: start from the defaults, then copy over only valid saved values. Code that reads saved data should never trust it blindly.
+
+### Files changed
+- `manifest.json`: version 0.2.0, `storage` permission, one content-script entry per site, `web_accessible_resources` for the friendly page.
+- `src/url-logic.js`: added `getInstagramReelCode`, `instagramRedirectUrl`, `isFacebookReelUrl`, `isSnapchatSpotlightUrl`.
+- `src/settings.js` (new): the site list, `DEFAULT_SETTINGS`, `withDefaults`, `isSiteEnabled`, `setSiteEnabled`.
+- `src/blocker-core.js` (new): shared engine (`start`, `hideLinks`, `blockedPageUrl`).
+- `sites/youtube.js`, `sites/youtube.css` (moved from `src/`): now use the engine; CSS scoped to the on/off attribute and given language-independent selectors.
+- `sites/instagram.*`, `sites/tiktok.*`, `sites/facebook.*`, `sites/snapchat.*` (new): each site's rules.
+- `blocked/blocked.html`, `blocked/blocked.css` (new): the friendly page.
+- `popup/popup.html`, `popup/popup.js` (new), `popup/popup.css`: the switches.
+- `tests/url-logic.test.js`: tests for the new URL functions. `tests/settings.test.js` (new): tests for settings.
+- `README.md`: new sites, hand tests for switches and French YouTube, new file list.
+
+### Most important lines
+```js
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area === 'sync' && changes[STORAGE_KEY]) {
+    apply(changes[STORAGE_KEY].newValue);
+  }
+});
+```
+"Whenever saved settings change, re-apply them on this page." `changes` only contains the keys that changed, and `newValue` is what was just saved. This is why flipping a switch in the popup works instantly.
+
+```js
+if (!isMatch(link.href)) continue;
+const box = (containerSelector && link.closest(containerSelector)) || link;
+```
+The CSS selector is a fast but rough filter; `isMatch` is the precise, tested answer. Then `||` means "use the post around the link if there is one, otherwise the link itself".
+
+```css
+html[data-shorts-blocker="on"] a[href$="/reels/"] { display: none !important; }
+```
+Hide every link ending in `/reels/`, but only while the switch is on.
+
+### Decisions
+- **French YouTube:** YouTube keeps the name "Shorts" untranslated in French, so Stage 1 already worked there. To be safe in every language, I added address-based rules (`a[href^="/shorts"]`, `a[href$="/shorts"]`) and kept the label rules as backups, now case-insensitive.
+- **Instagram Reels open as posts** (`/p/CODE/`), like YouTube Shorts open in the normal player: you can still watch what a friend sent, without the endless swipe. **Facebook and Snapchat** don't have a reliable "normal" address for a Reel/Spotlight, so those pages show the friendly page instead.
+- **One friendly page for every blocked site**, with no JavaScript, because it's simpler and MV3 doesn't allow inline scripts anyway.
+- **All settings are stored under one key** (`enabledSites`) as one object, which is simpler to read and save than five separate keys.
+- **Snapchat:** only `www.snapchat.com` (where Spotlight is). `web.snapchat.com` is for chatting and is left alone.
+- **TikTok switched off later:** the friendly page can't bring TikTok back by itself; you turn off the switch and open TikTok again (the page says so).
+- I couldn't test on the real sites from here: the selectors for Instagram, Facebook and Snapchat are based on their link addresses, which change less often than their layout, but check them by hand with the README steps.
+
+### Practice exercise
+Add a sixth site yourself, for example X/Twitter videos or another site you scroll too much. Add it to `SITES` in `src/settings.js`, create `sites/<name>.js` and `sites/<name>.css` by copying `sites/snapchat.*`, and add a content-script entry in `manifest.json`. Run `npm test`: the `DEFAULT_SETTINGS` test will fail because the list changed. Read the error and update the test. Then reload the extension and check the new switch appears in the popup.
+
+### Quiz
+1. Why does every CSS rule in `sites/` start with `html[data-shorts-blocker="on"]`?
+2. Why is `a[href$="/reels/"]` better than looking for a button with the text "Reels"?
+
+Answers
+
+1. CSS injected by the manifest can't be switched off by JavaScript. Scoping every rule to that attribute means `blocker-core.js` can turn all the hiding on or off by adding or removing one attribute on `<html>`.
+2. The text changes with the language (and Instagram can rename the button), but the link address stays the same in every language.

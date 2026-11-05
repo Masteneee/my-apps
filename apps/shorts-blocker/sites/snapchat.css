@@ -1,0 +1,4 @@
+/* Injected into www.snapchat.com. Only active while the Snapchat switch is on. */
+html[data-shorts-blocker="on"] [data-shorts-blocker-hidden] {
+  display: none !important;
+}

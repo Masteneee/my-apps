@@ -1,8 +1,8 @@
 {
   "name": "shorts-blocker",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
-  "description": "Chrome extension that hides short-form video. Vitest is only used to test the pure URL logic.",
+  "description": "Chrome extension that hides short-form video. Vitest is only used to test the pure URL and settings logic.",
   "scripts": {
     "test": "vitest run"
   },

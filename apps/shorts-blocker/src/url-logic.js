@@ -1,4 +1,4 @@
-// Pure URL logic for YouTube Shorts.
+// Pure URL logic for every site the extension supports.
 // "Pure" means: no DOM, no chrome.* APIs, no side effects. Text goes in, an
 // answer comes out. That is what makes this file easy to unit test with Vitest.
 //
@@ -51,7 +51,91 @@
     return `https://${host}/watch?v=${id}`;
   }
 
-  const ShortsUrl = { getShortsId, isShortsUrl, shortsToWatchUrl };
+  // ---------------------------------------------------------------------------
+  // Other sites (Stage 2)
+  // ---------------------------------------------------------------------------
+
+  // The main domain of each site. "Ends with .facebook.com" covers www., m.
+  // and any other subdomain, without matching a lookalike like "notfacebook.com".
+  const SITE_DOMAINS = {
+    instagram: 'instagram.com',
+    facebook: 'facebook.com',
+    snapchat: 'snapchat.com',
+  };
+
+  function hostIsOn(hostname, domain) {
+    return hostname === domain || hostname.endsWith('.' + domain);
+  }
+
+  // Splits the path of a URL into its pieces: "/reel/abc/" -> ["reel", "abc"].
+  // `baseUrl` lets relative links from the page ("/reel/abc") work too.
+  function pathParts(input, baseUrl) {
+    if (typeof input !== 'string' || input.trim() === '') return null;
+    try {
+      const url = new URL(input, baseUrl);
+      return { url, parts: url.pathname.split('/').filter(Boolean) };
+    } catch {
+      return null;
+    }
+  }
+
+  // Instagram post/reel codes are letters, digits, "-" and "_".
+  const INSTAGRAM_CODE_PATTERN = /^[A-Za-z0-9_-]+$/;
+
+  // Returns the code of a single Reel, or null.
+  // Reels show up as "/reel/CODE/", "/reels/CODE/" and "/username/reel/CODE/".
+  function getInstagramReelCode(input) {
+    const parsed = pathParts(input, 'https://www.instagram.com');
+    if (!parsed || !hostIsOn(parsed.url.hostname, SITE_DOMAINS.instagram)) return null;
+    const p = parsed.parts;
+    let code = null;
+    if ((p[0] === 'reel' || p[0] === 'reels') && p.length === 2) code = p[1];
+    if (p[1] === 'reel' && p.length === 3) code = p[2];
+    return code && INSTAGRAM_CODE_PATTERN.test(code) ? code : null;
+  }
+
+  // Where to send an Instagram Reels page instead, or null to stay.
+  // A single Reel opens as a normal post ("/p/CODE/"): you can still watch what
+  // a friend sent you, but there's no endless swipe to the next one.
+  // The Reels feed itself ("/reels/") goes back to the home feed.
+  function instagramRedirectUrl(input) {
+    const code = getInstagramReelCode(input);
+    if (code) return `https://www.instagram.com/p/${code}/`;
+    const parsed = pathParts(input, 'https://www.instagram.com');
+    if (!parsed || !hostIsOn(parsed.url.hostname, SITE_DOMAINS.instagram)) return null;
+    if (parsed.parts.length === 1 && parsed.parts[0] === 'reels') {
+      return 'https://www.instagram.com/';
+    }
+    return null;
+  }
+
+  // True for Facebook Reels pages: "/reel/123", "/reel/?s=tab", "/reels/...".
+  function isFacebookReelUrl(input) {
+    const parsed = pathParts(input, 'https://www.facebook.com');
+    if (!parsed || !hostIsOn(parsed.url.hostname, SITE_DOMAINS.facebook)) return false;
+    const first = parsed.parts[0];
+    return first === 'reel' || first === 'reels';
+  }
+
+  // True for Snapchat Spotlight pages: "/spotlight", "/spotlight/ID",
+  // and "/@username/spotlight/ID".
+  function isSnapchatSpotlightUrl(input) {
+    const parsed = pathParts(input, 'https://www.snapchat.com');
+    if (!parsed || !hostIsOn(parsed.url.hostname, SITE_DOMAINS.snapchat)) return false;
+    const p = parsed.parts;
+    if (p[0] === 'spotlight') return true;
+    return p.length >= 2 && p[0].startsWith('@') && p[1] === 'spotlight';
+  }
+
+  const ShortsUrl = {
+    getShortsId,
+    isShortsUrl,
+    shortsToWatchUrl,
+    getInstagramReelCode,
+    instagramRedirectUrl,
+    isFacebookReelUrl,
+    isSnapchatSpotlightUrl,
+  };
 
   // For the extension: youtube.js reads this global.
   globalThis.ShortsUrl = ShortsUrl;

@@ -1,0 +1,8 @@
+/*
+  Injected into facebook.com. Only active while the Facebook switch is on.
+  Facebook builds almost everything with JavaScript and random class names,
+  so most of the work is in sites/facebook.js; this file just applies its marks.
+*/
+html[data-shorts-blocker="on"] [data-shorts-blocker-hidden] {
+  display: none !important;
+}

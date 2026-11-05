@@ -1,0 +1,8 @@
+/*
+  Injected into tiktok.com. While the TikTok switch is on, hide the page
+  right away so no video flashes on screen during the split second before
+  sites/tiktok.js sends you to the "go do something else" page.
+*/
+html[data-shorts-blocker="on"] body {
+  visibility: hidden !important;
+}

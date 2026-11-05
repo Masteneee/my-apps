@@ -7,7 +7,7 @@ Not started.
 
 ## 1. shorts-blocker (Chrome extension)
 - [x] Stage 1: Skeleton + YouTube
-- [ ] Stage 2: Other sites + settings
+- [x] Stage 2: Other sites + settings
 - [ ] Stage 3: Polish + tests
 
 ## 2. wondered-site ("Have you ever wondered")
