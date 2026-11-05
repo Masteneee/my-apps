@@ -3,7 +3,7 @@
 Legend: `[ ]` to do, `[x]` done, `[?]` needs my choice, `[!]` failed (reason noted)
 
 ## Status
-Done: shorts-blocker (3/3), wondered-site (4/4). Next: media-log Stage 1. Then wellbeing-app, then budget-app phases 0 to 3. workout-app and study-tools are for later.
+Done: shorts-blocker (3/3), wondered-site (4/4), media-log Stages 1 to 5 (runs in demo mode with sample data; no Supabase/TMDB/IGDB keys yet). Next: media-log Stage 6. Best thing for me to do: create the Supabase project and TMDB key (see SETUP-NEEDED.md) so media-log can be tested for real.
 
 ## 1. shorts-blocker (Chrome extension)
 - [x] Stage 1: Skeleton + YouTube
